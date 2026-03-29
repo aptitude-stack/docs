@@ -39,9 +39,6 @@ flowchart LR
     Resolver --> Server
     Server --> DB["PostgreSQL"]
     Web["Future Web App"] --> Server
-    Docs["Aptitude/.github"] --- Publisher
-    Docs --- Resolver
-    Docs --- Server
 ```
 
 ## Architecture
