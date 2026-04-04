@@ -140,14 +140,14 @@ uvx aptitude-resolver@latest sync
 - **[Aptitude/aptitude-resolver](https://github.com/Aptitude/aptitude-resolver)** - agent-facing resolver for discovery, solving, lock generation, and execution planning
 - **[Aptitude/aptitude-publisher](https://github.com/Aptitude/aptitude-publisher)** - publishing and release surface for authors and CI
 
-## Documentation Map
+## Documentation Map - 
 
-- [Product Overview](./project%20overview.md)
-- [Competitive Landscape](./docs/project/competitive-landscape.md)
-- [High-Level Design](./high-level-design.md)
-- [Registry Docs](./docs/registry/README.md)
-- [Registry Architecture Overview](./docs/registry/architecture/system-overview.md)
-- [Registry API Contract](./docs/registry/reference/api-contract.md)
-- [Resolver Docs](./docs/resolver/README.md)
-- [Resolver Architecture Overview](./docs/resolver/architecture/system-overview.md)
-- [Registry/Resolver Boundary](./docs/registry/architecture/server-resolver-boundary.md)
+- [Product Overview](https://github.com/aptitude-stack/docs/blob/main/project%20overview.md)
+- [Competitive Landscape](https://github.com/aptitude-stack/docs/blob/main/docs/project/competitive-landscape.md)
+- [High-Level Design](https://github.com/aptitude-stack/docs/blob/main/high-level-design.md)
+- [Registry Docs](https://github.com/aptitude-stack/docs/blob/main/docs/registry/README.md)
+- [Registry Architecture Overview](https://github.com/aptitude-stack/docs/blob/main/docs/registry/architecture/system-overview.md)
+- [Registry API Contract](https://github.com/aptitude-stack/docs/blob/main/docs/registry/reference/api-contract.md)
+- [Resolver Docs](https://github.com/aptitude-stack/docs/blob/main/docs/resolver/README.md)
+- [Resolver Architecture Overview](https://github.com/aptitude-stack/docs/blob/main/docs/resolver/architecture/system-overview.md)
+- [Registry/Resolver Boundary](https://github.com/aptitude-stack/docs/blob/main/docs/registry/architecture/server-resolver-boundary.md)
