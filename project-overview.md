@@ -1,4 +1,4 @@
-# Design
+# Project Overview
 
 Aptitude is a **governed skill infrastructure for AI systems**. 
 It treats Skills as **structured, versioned, composable assets**, similar to how package managers treat software libraries.
@@ -215,9 +215,9 @@ This separation ensures simplicity, determinism, and scalability.
 
 | **Component** | **Core Responsibility** | **Owns** | **Does NOT Own** |
 | --- | --- | --- | --- |
-| **Publisher (aptitude-publisher)** | Skill authoring, validation, and publication enforcement | Packaging, authoritative validation, benchmarking, security checks, provenance capture, publish requests, CI integration | Persistence, catalog storage, dependency resolution, runtime execution, global state |
-| **Registry (Aptitude Registry)** | Immutable storage, access control, and technical validation | Schema validation, immutability enforcement, lifecycle states, persistence (PostgreSQL), discovery APIs, exact fetch APIs, audit logs | Governance policy enforcement, dependency resolution, skill selection, execution planning |
-| **Resolver (aptitude-resolver)** | Skill selection, dependency resolution, and execution planning | Query interpretation, candidate selection, dependency graph resolution, policy-aware filtering, lockfile generation, local materialization, integrity verification | Publishing, persistence, lifecycle management, canonical validation, global governance enforcement |
+| **Publisher** | Skill authoring, validation, and publication enforcement | Packaging, authoritative validation, benchmarking, security checks, provenance capture, publish requests, CI integration | Persistence, catalog storage, dependency resolution, runtime execution, global state |
+| **Registry** | Immutable storage, access control, and technical validation | Schema validation, immutability enforcement, lifecycle states, persistence (PostgreSQL), discovery APIs, exact fetch APIs, audit logs | Governance policy enforcement, dependency resolution, skill selection, execution planning |
+| **Resolver** | Skill selection, dependency resolution, and execution planning | Query interpretation, candidate selection, dependency graph resolution, policy-aware filtering, lockfile generation, local materialization, integrity verification | Publishing, persistence, lifecycle management, canonical validation, global governance enforcement |
 
 ---
 
