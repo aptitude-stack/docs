@@ -142,7 +142,7 @@ uvx aptitude-resolver@latest sync
 
 ## Documentation Map - 
 
-- [Product Overview](https://github.com/aptitude-stack/docs/blob/main/project%20overview.md)
+- [Product Overview](https://github.com/aptitude-stack/docs/blob/main/project-overview.md)
 - [Competitive Landscape](https://github.com/aptitude-stack/docs/blob/main/docs/project/competitive-landscape.md)
 - [High-Level Design](https://github.com/aptitude-stack/docs/blob/main/high-level-design.md)
 - [Registry Docs](https://github.com/aptitude-stack/docs/blob/main/docs/registry/README.md)
