@@ -10,76 +10,100 @@
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/features/actions)
 [![Google Cloud](https://img.shields.io/badge/Google%20Cloud-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com/)
 
-Aptitude is a versioned, dependency-aware ecosystem for AI skills.
+Aptitude is a governed, versioned skill infrastructure for AI systems.
 
-It gives teams and agent platforms a clean way to publish reusable skills,
-govern them through a registry, discover the right candidates quickly, and
-produce deterministic execution plans through a stable client-server contract.
-
-Today, Aptitude is CLI-first and MCP-first. A future web application can sit on
-top of the same APIs, but the core product boundary remains split across
-publisher, registry, and resolver surfaces.
+It turns skills into structured artifacts that can be published, discovered,
+resolved, locked, and materialized through a clear split between publishing,
+registry facts, and client-side decision making. The platform is CLI-first and
+MCP-first, with deterministic execution centered on immutable versions and
+resolver-generated lockfiles.
 
 ## What Aptitude Includes
 
-- `aptitude-publisher` for authoring and CI publishing workflows
-- `aptitude-server` for validation, immutable storage, discovery, fetch,
-  lifecycle governance, and audit
-- `aptitude-resolver` for CLI and MCP integration, reranking, dependency
-  solving, lock generation, and execution planning
-- PostgreSQL as the canonical store for metadata, content digests, lifecycle
-  state, and audit records
-- `Aptitude/.github` as the organization-level documentation and admin hub
+- `aptitude-publisher` for authoring workflows, packaging, validation, and CI-driven publication
+- `Aptitude Registry` for immutable storage, indexed discovery, exact fetch, lifecycle state, and audit
+- `aptitude-resolver` for query interpretation, candidate reranking, dependency solving, governance checks, lock generation, and local materialization
+- PostgreSQL as the canonical store for metadata, content digests, lifecycle state, and audit records
+- A documentation and operations layer that defines architecture, contracts, contributor workflows, and runbooks
 
 ```mermaid
 flowchart LR
     Author["Skill Author / CI"] --> Publisher["aptitude-publisher"]
     User["Developer / Agent / MCP Host"] --> Resolver["aptitude-resolver"]
-    Publisher --> Server["aptitude-server"]
-    Resolver --> Server
-    Server --> DB["PostgreSQL"]
-    Web["Future Web App"] --> Server
+    Publisher --> Registry["Aptitude Registry"]
+    Resolver --> Registry
+    Registry --> DB["PostgreSQL"]
+    Web["Future Web App"] --> Registry
 ```
 
-## Architecture
+## System Model
 
 Aptitude is intentionally split by ownership:
 
-- Server owns data-local work: publish validation, immutable storage, search,
-  exact fetch, lifecycle policy, and audit.
-- Resolver owns decision-local work: prompt interpretation, reranking, final
-  selection, dependency solving, lock generation, and execution planning.
-- Publisher owns packaging and release UX, but the server remains the only
-  authoritative source of truth for published skill state.
+- Publisher enforces skill quality before publication through packaging, validation, benchmarking, security checks, and provenance capture.
+- Registry stores immutable facts: published metadata, artifacts, checksums, lifecycle state, indexed discovery data, and audit records.
+- Resolver makes runtime decisions: query interpretation, candidate reranking, version selection, dependency expansion, governance evaluation, lock generation, and execution planning.
 
-This keeps the registry fast and cache-friendly while allowing runtime
-selection and planning logic to evolve independently on the client side.
+This boundary is deliberate: the registry returns facts, while the resolver makes the final decision about what to install and how to execute it.
+
+## Core Technical Flows
+
+- Publish: author or CI submits validated artifacts through the publisher into the registry as immutable versions.
+- Discovery: the registry returns candidate skills from indexed metadata and descriptions without making the final runtime choice.
+- Resolution: the resolver pins versions, expands dependencies, applies governance, and generates a deterministic lockfile.
+- Materialization: the resolver fetches exact artifacts, verifies integrity, and prepares the local environment.
+- Lock replay: existing locks skip discovery and solving so execution can be reproduced exactly.
+
+This model keeps storage and search stable while allowing resolver-side ranking and planning logic to evolve without changing registry truth.
 
 ## Why This Model
 
-- AI skills become reusable, versioned artifacts instead of ad hoc prompt glue.
-- Discovery stays fast because candidate retrieval happens close to indexed
-  metadata and descriptions.
-- Final skill choice remains context-aware because reranking and solving stay in
-  the resolver.
-- Reproducibility comes from immutable published versions and client-side locks.
+- Skills become reusable, versioned assets instead of ad hoc prompt glue.
+- Indexed discovery remains fast because candidate retrieval stays close to canonical metadata.
+- Runtime selection remains context-aware because final choice and graph solving happen in the resolver.
+- Reproducibility comes from immutable published versions, checksum-backed fetches, and client-side locks.
+- Governance can separate what exists, what is visible, and what is allowed at execution time.
+
+## How To Run
+
+Use `uvx` to launch the resolver directly without a manual install:
+
+```bash
+uvx aptitude-resolver@latest
+```
+
+Launch the installation wizard:
+
+```bash
+uvx aptitude-resolver@latest install
+```
+
+Launch the installation wizard with a free-text query:
+
+```bash
+uvx aptitude-resolver@latest install "query input (free text)"
+```
+
+Launch the sync wizard:
+
+```bash
+uvx aptitude-resolver@latest sync
+```
 
 ## Repositories
 
-- **[Aptitude/.github](https://github.com/Aptitude/.github)** - Organization
-  profile, shared documentation, architecture references, and admin material.
-- **[Aptitude/aptitude-server](https://github.com/Aptitude/aptitude-server)** -
-  Registry backend and public HTTP API.
-- **[Aptitude/aptitude-resolver](https://github.com/Aptitude/aptitude-resolver)** -
-  Agent-facing resolver for discovery, lock generation, and execution planning.
-- **[Aptitude/aptitude-publisher](https://github.com/Aptitude/aptitude-publisher)** -
-  Publishing and release surface for authors and CI.
+- **[Aptitude/.github](https://github.com/Aptitude/.github)** - organization profile, shared documentation, architecture references, and admin material
+- **[Aptitude/aptitude-server](https://github.com/Aptitude/aptitude-server)** - registry backend and public HTTP API
+- **[Aptitude/aptitude-resolver](https://github.com/Aptitude/aptitude-resolver)** - agent-facing resolver for discovery, solving, lock generation, and execution planning
+- **[Aptitude/aptitude-publisher](https://github.com/Aptitude/aptitude-publisher)** - publishing and release surface for authors and CI
 
-## Project Docs
+## Documentation Map
 
-- [Aptitude Stack Overview](../docs/project/overview.md)
-- [Repository Map](../docs/project/repository-map.md)
-- [Scope and Ownership Boundary](../docs/project/scope.md)
-- [Publisher, Server, Resolver Architecture](../docs/project/publisher-server-resolver-architecture.md)
-- [Server API Contract](../docs/project/api-contract.md)
-- [High-Level Design](../docs/high-level-design.md)
+- [Product Overview](./project%20overview.md)
+- [High-Level Design](./high-level-design.md)
+- [Registry Docs](./docs/registry/README.md)
+- [Registry Architecture Overview](./docs/registry/architecture/system-overview.md)
+- [Registry API Contract](./docs/registry/reference/api-contract.md)
+- [Resolver Docs](./docs/resolver/README.md)
+- [Resolver Architecture Overview](./docs/resolver/architecture/system-overview.md)
+- [Registry/Resolver Boundary](./docs/registry/architecture/server-resolver-boundary.md)
