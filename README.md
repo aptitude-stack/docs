@@ -18,6 +18,32 @@ registry facts, and client-side decision making. The platform is CLI-first and
 MCP-first, with deterministic execution centered on immutable versions and
 resolver-generated lockfiles.
 
+## Pain Points
+
+The current AI skill ecosystem lacks the structure needed to discover, trust,
+govern, and compose skills reliably at scale.
+
+- Accessibility: skills are scattered across repos, docs, and prompts, with no standard discovery mechanism.
+- Quality and security: validation, benchmarking, provenance, and trust signals are inconsistent or missing.
+- Governance and control: organizations lack closed, policy-controlled registries and lifecycle enforcement.
+- Dependency management and atomicity: skills are rarely packaged as atomic, reusable units with explicit dependency relationships.
+
+These gaps lead to low reuse, brittle agent behavior, unsafe capability usage,
+and non-deterministic execution.
+
+## The Aptitude Solution
+
+Aptitude turns skills into governed, versioned assets that can be safely
+discovered, resolved, and reused through a three-layer model:
+
+- Publish, govern, store: validated skills are packaged and published as immutable versioned artifacts.
+- Discover, retrieve: consumers query indexed metadata and fetch exact versions under policy-controlled visibility.
+- Decide, resolve, execute: the resolver selects candidates, expands dependencies, applies governance, and generates deterministic locks and execution plans.
+
+In practice, this turns loose capabilities into governed assets, prompt chaos
+into structured infrastructure, and trial-and-error usage into deterministic
+execution.
+
 ## What Aptitude Includes
 
 - `aptitude-publisher` for authoring workflows, packaging, validation, and CI-driven publication

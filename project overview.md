@@ -225,7 +225,7 @@ This separation ensures simplicity, determinism, and scalability.
 
 ## **7. Flows and User Experience**
 
-### **1. Publish Flow (Author → Registry)**
+### **Publish Flow (Author → Registry)**
 
 This flow turns a raw skill into a governed, immutable artifact.
 
@@ -240,7 +240,7 @@ A trusted, versioned skill becomes available for discovery.
 
 ---
 
-### **2. Discovery Flow (Consumer → Registry)**
+### **Discovery Flow (Consumer → Registry)**
 
 This flow allows humans or agents to explore available capabilities without requiring exact identifiers.
 
@@ -254,7 +254,7 @@ A filtered set of valid candidates, without making execution decisions.
 
 ---
 
-### **3. Resolution Flow (Resolver → Registry)**
+### **Resolution Flow (Resolver → Registry)**
 
 This flow turns already-discovered candidates into a deterministic, policy-compliant install plan.
 
@@ -274,7 +274,7 @@ If you want, I can also give you a slightly more executive/product-style version
 
 ---
 
-### **4. Materialization Flow (Resolver → Local Environment)**
+### **Materialization Flow (Resolver → Local Environment)**
 
 This flow turns the plan into actual usable capability.
 
@@ -289,7 +289,7 @@ Capabilities are available locally in a consistent state.
 
 ---
 
-### **5. Lock Replay Flow (Deterministic Execution)**
+### **Lock Replay Flow (Deterministic Execution)**
 
 This flow guarantees reproducibility.
 
@@ -304,7 +304,7 @@ Identical execution across runs, users, and systems.
 
 ---
 
-### **6. Governance Flow (Platform Control Layer)**
+### **Governance Flow (Platform Control Layer)**
 
 This flow ensures all usage remains compliant.
 
