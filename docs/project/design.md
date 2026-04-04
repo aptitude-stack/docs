@@ -143,6 +143,7 @@ Aptitude/
 
 ## Detailed References
 
+- [Competitive Landscape](./competitive-landscape.md)
 - [Repository Map](./repository-map.md)
 - [Scope and Ownership Boundary](./scope.md)
 - [Publisher, Server, Resolver Architecture](./publisher-server-resolver-architecture.md)

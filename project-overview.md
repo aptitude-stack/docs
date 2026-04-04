@@ -1,4 +1,4 @@
-# Aptitude Overview
+# Design
 
 Aptitude is a **governed skill infrastructure for AI systems**. 
 It treats Skills as **structured, versioned, composable assets**, similar to how package managers treat software libraries.
@@ -12,68 +12,79 @@ Instead of scattered prompts, scripts, and tools, Aptitude provides a system whe
 
 ---
 
-## **2. What are the main issues in skill governance?**
+## **1. What are the main issues in skill governance?**
 
 The current AI ecosystem lacks structure, making skills difficult to discover, trust, govern, and compose reliably at scale.
 
-### **1. Accessibility**
+### **Accessibility**
 
 - Skills are scattered across repos, docs, prompts
+- Discovery often depends on crawling GitHub or installing directly from source
 - No standard discovery mechanism
 - Agents rely on heuristics instead of structured access
 
 → Result: low reuse, duplication, brittle agent behavior
 
-### **2. Quality and Security**
+### **Quality and Security**
 
+- No strict publish pipeline before a skill becomes available
 - No standardized validation or benchmarking
 - No provenance or trust tracking
 - Skills can change silently
 
 → Result: unsafe, unreliable capability usage
 
-### **3. Governance and Control**
+### **Governance and Control**
 
-- No closed, policy-controlled registries
+- No closed, policy-controlled publication model for enterprise environments
+- No configurable organizational policy layer for agent behavior
 - No lifecycle management (published / deprecated / archived)
 - No enforcement layer between “available” and “allowed”
 
 → Result: enterprises cannot safely adopt AI skills
 
-### **4. Dependency Management and Atomicity**
+### **Dependency Management and Atomicity**
 
+- Skills are often written as monolithic prompts or workflows that try to do everything
 - Skills are not designed as atomic, reusable units
 - No explicit dependency model between skills
 - Composition requires manual orchestration or non-deterministic agent decisions
+- Teams have no shared lockfile mechanism to align agent behavior across environments
 
 → Result: non-deterministic systems, hard to evolve
 
 ---
 
-## **3. What solution does Aptitude provide?**
+## **2. What solution does Aptitude provide?**
 
 Aptitude introduces a structured system that transforms skills into governed, versioned assets that can be safely discovered, resolved, and reused.
 
 Aptitude introduces a **three-layer system**:
 
-### **1. Publish ⇒ Govern ⇒ Store**
+### **Publish ⇒ Govern ⇒ Store**
 
-- Skills go through a **publish pipeline**
-- Validated, benchmarked, audited
-- Stored as **immutable, versioned artifacts**
+- Skills go through a **strict publish pipeline**
+- Publication is intentionally closed and curated for enterprise-oriented governance
+- Skills are validated, benchmarked, audited, and enriched before publication
+- Skills are stored as **immutable, versioned artifacts** with lifecycle state
 
-### **2. Discover ⇒ Retrieve**
+### **Discover ⇒ Retrieve**
 
-- Structured metadata + indexing
+- Structured metadata, resources, and indexing
+- Exact version fetch without relying on GitHub crawling or `git clone` installation
+- High-performance registry storage is practical because most skills are small artifacts, typically within an `8 MB` envelope
 - Exact version fetch + dependency declarations
 - Policy-controlled visibility
 
-### **3. Decide ⇒ Resolve ⇒ Execute**
+### **Decide ⇒ Resolve ⇒ Execute**
 
 - Selects best candidate skill
-- Resolves dependencies
-- Applies governance rules
+- Treats skills as atomic building blocks that compose into reusable bundles
+- Resolves dependencies across metadata, resources, and related skills
+- Applies configurable governance rules defined by platform teams and users
+- Exposes an MCP-friendly interface so agents can operate within those guardrails natively
 - Produces a **deterministic lock + execution plan**
+- Enables teams and agents to share lockfiles and reproduce the same capability set out of the box
 
 ### **Key outcome**
 
@@ -82,6 +93,31 @@ Aptitude turns:
 - “loose capabilities” → into **governed assets**
 - “trial-and-error usage” → into **deterministic execution**
 - “prompt chaos” → into **structured infrastructure**
+
+---
+
+## **3. Competitive Landscape**
+
+The market already has tools for skill sharing, agent tooling, and skill
+research, but most solutions address only one slice of the problem.
+
+- **Skills.sh** and **OpenClaw + ClawHub** come closest because they treat
+  skills as distributable artifacts, but they stop short of strong governance,
+  strict validation, and reproducible resolution. Aptitude is more opinionated
+  about closed publication, structured registry storage, and enterprise control.
+- **LangChain** and **OpenAI Tools / Functions** enable capability use at
+  runtime, but they are not a governed packaging, registry, and lifecycle
+  system for skills.
+- **SkillNet** and **EvoSkills** are important research signals, but they are
+  aimed at experimentation and skill generation rather than production control.
+
+Aptitude is positioned differently: it treats skills as governed, versioned
+infrastructure assets. It does not depend on scattered GitHub sourcing or
+`git clone`-style installation. Instead, Aptitude stores small skills as
+structured, enriched artifacts in a high-performance registry, models them as
+atomic building blocks with dependencies and resources, and uses versions,
+lockfiles, MCP-friendly access, and configurable policy controls to make
+agentic collaboration reproducible and compliant.
 
 ---
 
