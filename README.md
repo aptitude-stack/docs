@@ -66,16 +66,6 @@ execution.
 - A documentation and operations layer that defines architecture, contracts,
   contributor workflows, and runbooks
 
-```mermaid
-flowchart LR
-    Author["Skill Author / CI"] --> Publisher["Aptitude Publisher"]
-    User["Developer / Agent / MCP Host"] --> Resolver["Aptitude Resolver"]
-    Publisher --> Registry["Aptitude Registry"]
-    Resolver --> Registry
-    Registry --> DB["PostgreSQL"]
-    Web["Future Web App"] --> Registry
-```
-
 ## System Model
 
 Aptitude is intentionally split by ownership:
@@ -107,6 +97,16 @@ makes the final decision about what to install and how to execute it.
 
 This model keeps storage and search stable while allowing resolver-side ranking
 and planning logic to evolve without changing registry truth.
+
+```mermaid
+flowchart LR
+    Author["Skill Author / CI"] --> Publisher["Aptitude Publisher"]
+    User["Developer / Agent / MCP Host"] --> Resolver["Aptitude Resolver"]
+    Publisher --> Registry["Aptitude Registry"]
+    Resolver --> Registry
+    Registry --> DB["PostgreSQL"]
+    Web["Future Web App"] --> Registry
+```
 
 ## Why This Model
 
@@ -170,7 +170,7 @@ uvx aptitude-resolver@latest sync --lock aptitude.lock.json
 - **[Aptitude/aptitude-resolver](https://github.com/Aptitude/aptitude-resolver)** - agent-facing resolver for discovery, solving, lock generation, and execution planning
 - **[Aptitude/aptitude-publisher](https://github.com/Aptitude/aptitude-publisher)** - authoring, packaging, validation, and publication workflows for authors and CI
 
-## Documentation Map -
+## Documentation Map - 
 
 - [Product Overview](https://github.com/aptitude-stack/docs/blob/main/project-overview.md)
 - [Competitive Landscape](https://github.com/aptitude-stack/docs/blob/main/docs/project/competitive-landscape.md)
