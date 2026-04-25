@@ -1,21 +1,41 @@
-# Storage Strategy
+# Storage Strategy for Skill Content
 
-This document describes how aptitude stores and materializes local state today.
+> Status: current storage decision record for the live registry baseline.
 
-## Current Strategy
+## Recommendation
 
-- registry data is read remotely through `registry/`
-- immutable content may be cached locally as an advisory optimization
-- lockfiles are the durable local execution input
-- materialization writes the selected skills into the requested target workspace
+Use PostgreSQL as the only persistence layer, but split queryable metadata from exact artifact storage.
 
-## Constraints
+The live artifact shape is now one immutable opaque artifact per version:
 
-- caches must never become a hidden source of truth
-- lock replay must remain valid without discovery or dependency solving
-- checksum verification happens during materialization, not as an afterthought
+- metadata, governance, provenance, and relationships stay normalized and queryable
+- exact artifact bytes are stored once per digest in `skill_contents`
+- version rows bind immutably to one digest-addressed artifact blob
+- discovery and ranking never inspect artifact contents beyond publish-time validation
+- exact fetch returns the stored artifact bytes directly and emits the stored content digest as the artifact `ETag`
 
-## Deferred Areas
+## Why
 
-- richer cache invalidation strategy beyond current advisory behavior
-- broader local storage abstractions if plugins, SDK, or MCP surfaces require them
+This is the simplest design that still preserves the right architectural boundary.
+
+- Discovery stays fast because it reads normalized search documents only.
+- Exact fetch stays precise because it returns the original `application/zstd` artifact.
+- Publish stays transactional because the registry still uses one storage system.
+- Deduplication stays cheap because identical artifacts share one digest-backed row.
+- Version identity stays stable because version checksums are derived from the content digest plus structured version data instead of unpacked artifact content.
+
+## Rejected Alternatives
+
+- Filesystem storage: adds cross-store consistency problems for little value.
+- Object storage: useful for larger artifacts, but unnecessary complexity for current workloads.
+- Reconstructing artifacts from normalized rows: wrong abstraction, loses artifact fidelity.
+
+## Current Direction
+
+The registry is no longer markdown-content-centric.
+
+- New publishes do not send `content.raw_markdown`.
+- Exact content fetch does not return `text/markdown`.
+- The authoritative stored artifact is a `.tar.zst` blob.
+- Structured metadata remains separately queryable and independently evolvable.
+- Search and document size fields now reflect stored artifact size, not extracted markdown length.

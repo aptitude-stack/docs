@@ -1,11 +1,13 @@
 # Reference Docs
 
-Use this directory for stable technical reference that supports implementation without redefining architecture.
+Reference docs capture stable technical facts and artifacts that support implementation work without becoming the architecture source of truth.
 
 ## Contents
 
-- [`api-contract.md`](api-contract.md): canonical HTTP contract
-- [`publish-request-schema.md`](publish-request-schema.md): publish request reference
-- [`schema.md`](schema.md): canonical PostgreSQL schema baseline
-- [`storage-strategy.md`](storage-strategy.md): current storage decision
-- [`operations/README.md`](operations/README.md): operational runbook index
+- [cli-command-reference.md](cli-command-reference.md): full user-facing CLI command list and flags
+- [api-contract.md](api-contract.md): concrete runtime-facing registry contract and lock assumptions
+- [schema.md](schema.md): local schema surfaces for config and lock data
+- [storage-strategy.md](storage-strategy.md): current storage and materialization strategy
+- [recommended-libraries.md](recommended-libraries.md): library choices and their status
+- [openapi/README.md](openapi/README.md): raw API artifact explanation
+- [operations/README.md](operations/README.md): operational runbook index

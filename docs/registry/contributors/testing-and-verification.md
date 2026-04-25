@@ -1,46 +1,37 @@
 # Testing And Verification
 
-## Expectations
+Use this guide when deciding what to run before calling work complete.
 
-Every non-trivial change should leave behind:
-
-- focused unit coverage for changed behavior
-- deterministic behavior checks when ordering or selection matters
-- updated docs when boundaries or behavior changed
-
-## Fast Verification
-
-For quick feedback, prefer focused pytest slices around the packages you touched.
-
-Common high-signal slices:
-
-- `tests/unit/interfaces/cli/`
-- `tests/unit/application/`
-- `tests/unit/resolution/`
-- `tests/unit/lockfile/`
-- `tests/unit/shared/test_imports.py`
-
-## Full Verification
+## Default Commands
 
 ```bash
+make quality
 make test
-make lint
-make typecheck
 ```
 
-## Integration Tests
-
-The integration suite hits the live Aptitude Server boundary and is marked with `integration`.
-
-Run it intentionally, not by default:
+For doc and contract sync work, the focused guardrails are:
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv run --extra dev pytest -m integration -q
+UV_CACHE_DIR=.uv-cache uv run --extra dev pytest \
+  tests/unit/test_public_contract_docs.py \
+  tests/unit/test_api_contract_examples.py -q
 ```
 
-## What To Verify Before Calling Work Complete
+## What Counts As Verification
 
-- the intended tests pass with fresh output
-- no import-path drift remains after package moves
-- CLI help and user-facing error rendering still make sense
-- canonical docs and agent docs reflect the current resolver identity
+- Doc-only changes: link/reference sweep plus manual review of the affected entrypoints.
+- Behavior changes: relevant unit or integration coverage plus the default command set when feasible.
+- Contract changes: update the canonical docs and run the tests that cover route surface, OpenAPI shape, and affected DTOs.
+- Operability changes: verify the relevant Prometheus, Loki, Grafana, or smoke-test assets.
+
+## Determinism Checks
+
+When a change touches discovery ordering, exact fetch semantics, lifecycle visibility, or dependency-selector reads:
+
+- verify stable ordering and tie-break assumptions
+- verify no new hidden route aliases or compatibility surfaces were introduced
+- verify discovery remains body-free and exact fetch remains coordinate-based
+
+## Docs Sync Rule
+
+If behavior changes, update the canonical documentation in the same change. Do not leave current implementation ahead of `docs/architecture/*` or `docs/reference/*`.

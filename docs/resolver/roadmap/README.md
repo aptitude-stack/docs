@@ -1,15 +1,17 @@
-# Roadmap Docs
+# Resolver Roadmap
 
-This directory holds forward-looking technical direction.
+This section tracks forward-looking technical direction.
 
-## Rules
+Status labels used here:
 
-- Everything here is non-normative unless promoted into `docs/architecture/*` or `docs/reference/*`.
-- The canonical implementation sequence remains [`.agents/plans/roadmap.md`](../../.agents/plans/roadmap.md).
-- Use this area for technical direction, deferred work, and drafts that should not be mistaken for live contract truth.
+- `current`: already implemented or actively being hardened
+- `planned`: expected next capability
+- `deferred`: intentionally not in the current wave
 
 ## Contents
 
-- [`requirements-and-phases.md`](requirements-and-phases.md)
-- [`near-term-evolution.md`](near-term-evolution.md)
-- [`drafts/`](drafts/)
+- [client-policy-summary.md](client-policy-summary.md)
+- [client-policy-configuration.md](client-policy-configuration.md)
+- [requirements-and-phases.md](requirements-and-phases.md)
+- [near-term-evolution.md](near-term-evolution.md)
+- [interface-expansion.md](interface-expansion.md)

@@ -1,12 +1,11 @@
 # Operations Runbooks
 
-This section is the resolver-side operational entrypoint.
+These runbooks cover the live operational surfaces for local validation and production-style incident response.
 
-Current operationally relevant areas in this repo:
-
-- running the CLI and wizard locally
-- verifying focused or full test suites
-- understanding the live registry boundary used by integration tests
-- validating docs and package identity after renames or boundary changes
-
-For local commands, start with [../../contributors/development-setup.md](../../contributors/development-setup.md).
+- [`publish-failures.md`](publish-failures.md)
+- [`discovery-latency-regression.md`](discovery-latency-regression.md)
+- [`resolution-failures.md`](resolution-failures.md)
+- [`fetch-failures.md`](fetch-failures.md)
+- [`governance-denials.md`](governance-denials.md)
+- [`metrics-scrape-failures.md`](metrics-scrape-failures.md)
+- [`log-ingestion-failures.md`](log-ingestion-failures.md)

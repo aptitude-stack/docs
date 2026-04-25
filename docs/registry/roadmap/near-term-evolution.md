@@ -1,21 +1,16 @@
 # Near-Term Evolution
 
-## Current
+This document summarizes the next technical themes without replacing the canonical implementation sequence in [`.agents/plans/roadmap.md`](../../.agents/plans/roadmap.md).
 
-- deterministic fresh planning through discovery, resolver, governance, lockfile, and execution
-- lock replay through `sync --lock`
-- workspace policy loading from `aptitude.toml`
-- cache, retry, telemetry, and richer CLI and wizard surfaces
+## Current Themes
 
-## Planned
+- Hardening observability and release readiness around the frozen route surface
+- Clarifying environment separation and auth/token governance
+- Improving discovery quality without moving resolver responsibilities into the registry
+- Preserving the PostgreSQL-first storage model while keeping revisit triggers explicit
 
-- organization-managed policy sources
-- better winner-vs-runner-up explanation derived directly from ranking output
-- broader contributor and interface hardening around the current flows
+## Out Of Scope For This Doc
 
-## Deferred
-
-- `latest` selection profile
-- plugins package
-- SDK surface
-- MCP surface
+- detailed milestone acceptance criteria
+- canonical API or schema truth
+- implementation-order decisions already owned by `.agents/plans/roadmap.md`

@@ -16,7 +16,15 @@ Current policy precedence:
 
 1. per-request override
 2. workspace policy
-3. resolver defaults
+3. user policy
+4. system policy
+5. resolver defaults
+
+Policy merging is restrictive-only:
+
+- allowed lists intersect
+- numeric ceilings take the minimum
+- lower layers may tighten higher-level policy, but they may not weaken it
 
 Current selection-preference precedence:
 
@@ -24,7 +32,8 @@ Current selection-preference precedence:
 2. environment override
 3. workspace config
 4. user config
-5. resolver default
+5. system config
+6. resolver default
 
 ## Candidate Policy Before Final Selection
 

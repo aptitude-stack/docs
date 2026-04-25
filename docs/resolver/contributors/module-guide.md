@@ -1,25 +1,32 @@
 # Module Guide
 
-This is the shortest useful map from architecture to the actual package tree under `app/`.
+This guide maps responsibilities to the current `src/aptitude_resolver/` tree.
 
-## Top-Level Ownership
+## Core Packages
 
-- `app/interface/`: FastAPI routes, DTOs, validation, auth, and HTTP error mapping. Must not reach into persistence directly.
-- `app/core/`: domain services, ports, governance, fetch, discovery, and lifecycle behavior. Owns business rules.
-- `app/intelligence/`: pure search and ranking support logic. Supports discovery but does not turn the registry into a resolver.
-- `app/persistence/`: SQLAlchemy models, repositories, and storage projections. Implements core ports.
-- `app/audit/`: audit recording and audit-facing storage logic.
-- `app/observability/`: metrics, logging, request correlation, and telemetry helpers.
+- `application/`: use-case orchestration, DTO boundaries, workflow sequencing
+- `cache/`: advisory caches around registry-backed reads
+- `discovery/`: intent parsing, query building, non-final candidate reranking
+- `domain/`: models, policy types, tracing, resolver-owned errors
+- `execution/`: execution planning and materialization from lock data
+- `governance/`: legality checks before lock generation
+- `lockfile/`: durable resolved representation, serializer, parser, and replay helpers
+- `registry/`: Aptitude Server transport, auth, and transport-to-domain mapping
+- `resolution/`: deterministic version selection, root selection, dependency expansion, conflict checks, validation
 
-## Practical Reading Order
+## Interface Packages
 
-1. [`../../app/README.md`](../../app/README.md)
-2. [`../../app/interface/README.md`](../../app/interface/README.md)
-3. [`../../app/core/README.md`](../../app/core/README.md)
-4. [`../../app/persistence/README.md`](../../app/persistence/README.md)
+- `interfaces/cli/`: Typer command surface, wizard metadata, and install-first guided flow
+- `interfaces/shared/`: shared workflow helpers used by multiple interface surfaces
 
-## Boundary Reminders
+## Support Packages
 
-- Interface must not import persistence internals.
-- Core must not import persistence internals directly.
-- Persistence exists to support the canonical registry contract, not to define it.
+- `shared/config/`: environment and file-backed configuration
+- `shared/logging/`: logging setup
+- `telemetry/`: additive instrumentation
+
+## Reserved Or Deferred Areas
+
+- `plugins/`: planned, not implemented
+- `interfaces/sdk/`: planned, not implemented
+- `interfaces/mcp/`: planned, not implemented

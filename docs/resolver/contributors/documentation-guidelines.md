@@ -1,22 +1,39 @@
 # Documentation Guidelines
 
-## Canonical vs Derivative
+## Canonical Vs Derivative Docs
 
-- `docs/architecture/*`: canonical current-state architecture and invariants
-- `docs/reference/*`: canonical stable reference and operations material
-- `docs/contributors/*`: canonical workflow guidance for engineers
-- `docs/roadmap/*`: forward-looking and explicitly non-normative
-- `.agents/*`: derivative agent operating context only
+Canonical human-facing docs live under `docs/`.
 
-## Update Expectations
+Derivative agent-facing docs live under `.agents/` and should point back to canonical docs instead of restating them in full.
 
-- Update canonical docs in the same change when behavior, architecture, or reference truth changes.
-- Do not duplicate architecture in `.agents/*` or module READMEs when a short link will do.
-- Keep root `README.md` concise; push durable detail into `docs/`.
+## Current-State Vs Forward-Looking Docs
 
-## Writing Rules
+- `docs/architecture/` and `docs/reference/` describe current truth.
+- `docs/roadmap/` describes planned or deferred direction.
 
-- Separate current-state docs from roadmap material.
-- Mark drafts and future direction clearly.
-- Prefer short, factual prose over milestone-story narration in canonical docs.
-- Historical changelogs stay historical; do not use them as the live source of truth.
+Do not mix current-state guarantees with future intent in the same paragraph unless the difference is explicit.
+
+## Update Rules
+
+Update docs in the same change when you alter:
+
+- product or package identity
+- architecture boundaries
+- command behavior
+- lock or governance behavior
+- package ownership
+
+Minimum files to consider on non-trivial changes:
+
+- `README.md`
+- `docs/README.md`
+- relevant `docs/architecture/*`
+- relevant contributor or reference docs
+- `.agents/agent.md`
+- `.agents/memory/meta.md`
+
+## Historical Plans
+
+`.agents/plans/` is implementation history.
+
+Do not treat plan files as current architecture or contributor guidance. If a plan disagrees with canonical docs, the canonical docs win.

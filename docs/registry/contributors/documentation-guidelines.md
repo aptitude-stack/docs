@@ -1,39 +1,36 @@
 # Documentation Guidelines
 
-## Canonical Vs Derivative Docs
+## Canonical Homes
 
-Canonical human-facing docs live under `docs/`.
+- `docs/architecture/*`: canonical current-state explanation and invariants
+- `docs/reference/*`: canonical contracts, schema, settings, and runbooks
+- `docs/contributors/*`: canonical tutorials and how-to workflow guidance
+- `docs/roadmap/*`: canonical PRD plus forward-looking explanation
+- `docs/drafts/*`: non-canonical working analysis only
+- `docs/changelog/*`: implementation history only
+- `.agents/*`: derivative agent operating context only
 
-Derivative agent-facing docs live under `.agents/` and should point back to canonical docs instead of restating them in full.
+## Edit The Canonical Doc When
 
-## Current-State Vs Forward-Looking Docs
+- Update canonical docs in the same change when behavior, architecture, or reference truth changes.
+- Keep one canonical home per truth. Link instead of repeating the same explanation in multiple places.
+- Keep root `README.md` concise; push durable detail into `docs/`.
 
-- `docs/architecture/` and `docs/reference/` describe current truth.
-- `docs/roadmap/` describes planned or deferred direction.
+## Create A Draft Only When
 
-Do not mix current-state guarantees with future intent in the same paragraph unless the difference is explicit.
+- The design is unresolved and should not yet be treated as current truth.
+- The document is exploratory context, not a live contract or workflow.
+- The file starts with a status line and links to the live canonical sources.
 
-## Update Rules
+## Promote, Merge, Or Delete
 
-Update docs in the same change when you alter:
+- Promote by moving settled truth into `docs/architecture/*`, `docs/reference/*`, `docs/contributors/*`, or `docs/roadmap/*`.
+- Merge when a draft overlaps a canonical doc but still contains useful framing that should survive.
+- Delete when the draft is duplicated, superseded, abandoned, or misleading.
 
-- product or package identity
-- architecture boundaries
-- command behavior
-- lock or governance behavior
-- package ownership
+## Writing Rules
 
-Minimum files to consider on non-trivial changes:
-
-- `README.md`
-- `docs/README.md`
-- relevant `docs/architecture/*`
-- relevant contributor or reference docs
-- `.agents/agent.md`
-- `.agents/memory/meta.md`
-
-## Historical Plans
-
-`.agents/plans/` is implementation history.
-
-Do not treat plan files as current architecture or contributor guidance. If a plan disagrees with canonical docs, the canonical docs win.
+- Separate current-state docs from roadmap material.
+- Mark drafts and future direction clearly.
+- Prefer short, factual prose over milestone-story narration in canonical docs.
+- Historical changelogs stay historical; do not use them as the live source of truth.

@@ -1,118 +1,48 @@
 # Development Setup
 
-> This is the canonical local setup guide. The root `README.md` stays short and links here for the full workflow.
+## Runtime
 
-This guide shows the simplest way to run `Aptitude Registry` locally for development.
+- Python `>=3.9`
+- `uv` for environment and task execution
 
-## Prerequisites
-
-- Python `3.12+`
-- [`uv`](https://docs.astral.sh/uv/)
-- Docker
-
-## 1. Start PostgreSQL
+## Install Dependencies
 
 ```bash
-make db-up
-```
-
-This starts PostgreSQL on `127.0.0.1:5432` with:
-
-- database: `aptitude`
-- user: `postgres`
-- password: `postgres`
-
-## 2. Install Dependencies
-
-```bash
-uv venv
-source .venv/bin/activate
 uv sync --extra dev
 ```
 
-## 3. Configure Environment
+## Common Commands
 
-```bash
-export DATABASE_URL="postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude"
-export AUTH_TOKENS_JSON='{"reader-token":["read"],"publisher-token":["read","publish"],"admin-token":["read","publish","admin"]}'
-```
-
-Optional:
-
-```bash
-export LOG_LEVEL="INFO"
-export LOG_FORMAT="auto"
-```
-
-`LOG_FILE_PATH` is optional and only used by the Docker-based local observability profile.
-
-## 4. Run Migrations
-
-```bash
-make migrate-up
-```
-
-## 5. Start The API
+Use the provided `Makefile` for everyday work:
 
 ```bash
 make run
-```
-
-Local URLs:
-
-- API: `http://127.0.0.1:8000`
-- Swagger docs: `http://127.0.0.1:8000/docs`
-- Metrics: `http://127.0.0.1:8000/metrics`
-
-## 6. Common Commands
-
-```bash
+make debug
 make test
 make lint
 make format
 make typecheck
-make migrate-down
-make db-down
 ```
 
-## Quick Check
+Direct `uv` equivalents:
 
 ```bash
-curl http://127.0.0.1:8000/healthz
+UV_CACHE_DIR=.uv-cache uv run --extra dev pytest -q
+UV_CACHE_DIR=.uv-cache uv run --extra dev ruff check src tests
+UV_CACHE_DIR=.uv-cache uv run --extra dev ruff format src tests
+UV_CACHE_DIR=.uv-cache uv run --extra dev python -m mypy src tests
 ```
 
-For authenticated routes, send one of the tokens from `AUTH_TOKENS_JSON` as:
+## Entry Points
 
-```bash
-Authorization: Bearer reader-token
-```
+- verified repo-local entrypoint: `PYTHONPATH=src .venv/bin/python -m aptitude_resolver`
+- logical console command name: `aptitude`
 
-Clients may also send an `X-Request-ID` header. The API echoes it on every response so logs, metrics, and audit rows can be correlated.
+Running the module entrypoint with no arguments currently launches the install-first wizard and falls back to CLI subcommands when arguments are present. Use `aptitude manifest` to inspect the full command and flag surface without entering the wizard.
 
-## Optional Local Observability Profile
+## Naming Conventions
 
-```bash
-make observability-up
-```
+- prefer `kebab-case` for non-imported filenames such as Markdown docs and similar repo artifacts
+- keep Python packages and importable module files in `snake_case`
 
-This starts the API plus:
-
-- Prometheus at `http://127.0.0.1:9090`
-- Loki at `http://127.0.0.1:3100`
-- OTLP gRPC at `http://127.0.0.1:4317`
-- OTLP HTTP at `http://127.0.0.1:4318`
-- Grafana at `http://127.0.0.1:3000`
-
-Shut the stack down with:
-
-```bash
-make observability-down
-```
-
-### Verify Log Flow
-
-```bash
-curl -H 'X-Request-ID: setup-dev-loki-check' http://127.0.0.1:8000/healthz
-```
-
-Then open Grafana and search for `setup-dev-loki-check` in the `Aptitude Registry Logs` dashboard.
+Python import paths must be valid identifiers. Using `kebab-case` for importable Python modules creates awkward or invalid imports, so this repo should not apply the same filename rule everywhere.

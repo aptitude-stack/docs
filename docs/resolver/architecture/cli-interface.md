@@ -22,6 +22,7 @@ The CLI exists to give humans one reliable local interface for:
 
 - fresh planning from a natural-language query
 - lock replay from an existing resolver lockfile
+- inspecting the effective local client policy
 - reviewing the command surface without reading source code
 
 The current UX goals are:
@@ -59,26 +60,19 @@ The CLI currently routes requests with these rules:
 - `aptitude install` with no query and no advanced overrides launches the install flow directly inside the wizard
 - `aptitude sync` with no `--lock` and no `--json` launches the sync flow directly inside the wizard
 - `aptitude install ...` with explicit arguments runs the Typer command path
+- `aptitude policy show` prints the effective client policy and config layers
 - `aptitude sync ...` with explicit arguments runs the Typer command path
 - `aptitude manifest` prints the full command and flag capability map
 - hidden `aptitude resolve ...` exists for advanced preview and debugging of fresh planning without materialization
 
 The CLI therefore supports both discovery-oriented use and automation-oriented use without maintaining two separate products.
 
-For published one-off usage without a persistent install, the promoted entry examples are:
-
-```bash
-uvx aptitude-resolver@latest
-uvx aptitude-resolver@latest install
-uvx aptitude-resolver@latest install "<query text>"
-uvx aptitude-resolver@latest sync
-```
-
 ## Command Surface
 
 ### Public Commands
 
 - `install`: fresh planning from a query plus local materialization
+- `policy show`: inspect effective client policy and contributing config layers
 - `sync`: lock replay and local materialization from an existing lockfile
 - `manifest`: human-readable capability map for commands and flags
 
@@ -86,12 +80,10 @@ uvx aptitude-resolver@latest sync
 
 - `resolve`: hidden preview/debug surface that follows the fresh-planning path but stops before materialization and prints stable JSON
 
-### Global Framework Flags
+### Global Flags
 
 - `--version`: print the installed Aptitude version and exit
 - `--help`: show command help
-- `--install-completion`: install shell completion for the current shell
-- `--show-completion`: print shell completion for manual installation or customization
 
 ## Catalog-Driven Help Contract
 
@@ -99,6 +91,7 @@ uvx aptitude-resolver@latest sync
 
 - root help text
 - command help text
+- policy inspection help text
 - manifest output
 - wizard-facing capability summaries
 - shared CLI visual tokens
@@ -189,6 +182,7 @@ The current CLI rendering contract is:
 - the wizard uses a shared 140-character separator line
 - human-facing summaries use Rich panels, text styling, and transient status/progress indicators
 - help and manifest output stay text-first and copy-paste-friendly
+- `policy show` uses a text-first inspection report by default and JSON when explicitly requested
 - install and sync success summaries are concise and package-manager-like
 - the wizard should feel structured, but it must remain readable in ordinary terminals without relying on full-screen layouts
 
@@ -216,7 +210,7 @@ The CLI distinguishes between expected resolver failures, configuration problems
 `support.py` renders tailored messages for:
 
 - missing environment configuration
-- invalid CLI or workspace configuration
+- invalid CLI, system, user, or workspace configuration
 - invalid explicit candidate selection
 - invalid lockfiles
 - checksum mismatches

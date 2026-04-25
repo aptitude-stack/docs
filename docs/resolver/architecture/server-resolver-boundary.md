@@ -1,48 +1,35 @@
 # Server-Resolver Boundary
 
-> Status: canonical ownership contract between `Aptitude Registry` and `aptitude-resolver`.
-> Use [`../reference/api-contract.md`](../reference/api-contract.md) for the live route contract.
+This document defines the hard ownership split between Aptitude Server and aptitude.
 
-## Purpose
+## Server Owns Facts
 
-This document defines the hard split between registry responsibilities and resolver responsibilities.
+The server owns:
 
-The split exists so indexed retrieval and immutable storage stay close to the database, while prompt-sensitive decision-making stays close to the runtime context that actually needs it.
+- registry storage
+- immutable metadata
+- immutable artifacts
+- indexed candidate retrieval
+- published checksum facts
 
-## Core Rule
+The server may inform ranking and governance by returning facts, but it does not make the final decision for the resolver.
 
-- Registry owns data-local work.
-- Resolver owns decision-local work.
+## Resolver Owns Decisions
 
-## Registry Owns
+The resolver owns:
 
-- immutable publish
-- discovery candidate generation
-- exact dependency reads
-- exact immutable metadata/content fetch
-- lifecycle governance
-- provenance capture
-- audit and observability at the registry boundary
-
-## Resolver Owns
-
-- prompt interpretation
-- discovery request construction
-- reranking and pruning
-- final skill selection
+- intent interpretation
+- candidate reranking
+- version selection
+- final root selection
 - dependency solving
-- lock generation and replay
+- governance
+- lock generation
 - execution planning
 
-## Contract Consequences
+## Practical Consequences
 
-- Discovery returns ordered candidate slugs only.
-- Resolution returns direct authored `depends_on` selectors only.
-- Exact fetch returns immutable metadata or immutable markdown for one coordinate.
-- The registry never returns canonical solved bundles or runtime plans.
-
-## Design Rationale
-
-- Search belongs on the registry because it is an indexed retrieval problem.
-- Final selection belongs on the resolver because it depends on prompt nuance, policy, environment, and installed state.
-- Dependency solving belongs on the resolver because runtime reproducibility must be tied to a client-owned lock, not to mutable server-side solve state.
+- discovery may consume server facts, but final root choice remains local
+- lock replay must not call discovery or dependency solving again
+- transport artifacts in `docs/reference/openapi/` inform the registry boundary, but they do not override resolver architecture docs
+- if code begins depending on server ordering as final truth, the boundary has been violated
