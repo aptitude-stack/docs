@@ -5,7 +5,6 @@
 **Members:** Ela Shaul, Aviel Adika, Yonatan Csasnik
 
 
-
 ## 1. Executive Summary
 
 - **Problem Statement**: Teams need a reliable way to publish, discover, resolve, and execute skills through agents without coupling authoring workflows, registry storage, and runtime decision-making into one hard-to-scale service. Today, Aptitude needs a project-level design that defines how publisher, registry, resolver, and agent-facing interfaces work together as one product.
@@ -90,13 +89,42 @@ flowchart LR
 
 ### Component Breakdown
 
-| Component | Primary Role | Owns | Does Not Own |
-| --- | --- | --- | --- |
+| Component            | Primary Role | Owns | Does Not Own |
+|----------------------| --- | --- | --- |
 | `aptitude-publisher` | Publish client | Packaging, local prechecks, request assembly, CI and author UX | Canonical validation, persistence, runtime solving |
-| `aptitude-server` | Registry backend | Auth, validation, immutability, governance, persistence, search, audit | Prompt interpretation, final selection, dependency solving, execution planning |
-| `aptitude-resolver` | Runtime client | Discovery query construction, reranking, solve, lock, execution planning, MCP and CLI surfaces | Publish packaging, canonical registry policy |
-| `PostgreSQL` | Canonical data store | Skill metadata, versions, content digests, lifecycle state, audit records | Client-side runtime decision logic |
-| `Future Web App` | UX layer | Catalog browsing, skill inspection, operator workflows | Registry source of truth, solving logic |
+| `aptitude-server`    | Registry backend | Auth, validation, immutability, governance, persistence, search, audit | Prompt interpretation, final selection, dependency solving, execution planning |
+| `aptitude-resolver`  | Runtime client | Discovery query construction, reranking, solve, lock, execution planning, MCP and CLI surfaces | Publish packaging, canonical registry policy |
+| `PostgreSQL`         | Canonical data store | Skill metadata, versions, content digests, lifecycle state, audit records | Client-side runtime decision logic |
+| `Website`            | UX layer | Catalog browsing, skill inspection, operator workflows | Registry source of truth, solving logic |
+
+```mermaid
+graph TB
+    subgraph Users
+        Browser["🌐 Browser"]
+        Dev["💻 Developer"]
+    end
+
+    subgraph Vercel["Vercel"]
+        Website["Next.js Website  aptitude-registry.dev    Server Components → registry fetch  BFF /api/search → registry fetch  archive.ts → tar.zst extraction  InstallButton → copy to clipboard"]
+    end
+
+    subgraph Render["Render"]
+        Registry["aptitude-registry-api  api.aptitude-registry.dev    POST /discovery  GET /skills/{slug}  GET /skills/{slug}/{version}  GET /skills/{slug}/{version}/content"]
+    end
+
+    subgraph Local["Developer Machine"]
+        CLI["aptitude install skill-name  (aptitude-resolver CLI)"]
+        MCP["aptitude-mcp  (MCP server for Claude)"]
+    end
+
+    Browser -->|"HTTP"| Website
+    Website -->|"Bearer token  (server-side only)"| Registry
+
+    Dev --> CLI
+    Dev --> MCP
+    CLI -->|"Bearer token"| Registry
+    MCP -->|"Bearer token"| Registry
+```
 
 ### Data Model and Storage
 
