@@ -12,6 +12,8 @@
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
 [![Neon](https://img.shields.io/badge/Neon-00E599?style=for-the-badge&logo=neon&logoColor=black)](https://neon.tech/)
 
+**Links:** [Website](https://aptitude-stack.dev) · [PyPI](https://pypi.org/org/Aptitude/) · [Docs](https://github.com/aptitude-stack/docs) · [High Level Design](https://github.com/aptitude-stack/docs/blob/main/high-level-design.md) · [Product Overview](https://github.com/aptitude-stack/docs/blob/main/product-overview.md)
+
 Aptitude is a governed, versioned skill platform for AI systems.
 
 It turns skills into structured artifacts that can be published through a
