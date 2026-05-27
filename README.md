@@ -8,7 +8,9 @@
 [![Ruff](https://img.shields.io/badge/ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=111111)](https://docs.astral.sh/ruff/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/features/actions)
-[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com/)
+[![Render](https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://render.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
+[![Neon](https://img.shields.io/badge/Neon-00E599?style=for-the-badge&logo=neon&logoColor=black)](https://neon.tech/)
 
 Aptitude is a governed, versioned skill platform for AI systems.
 
@@ -61,7 +63,9 @@ execution.
 - `aptitude-resolver` for query interpretation, candidate reranking, version
   selection, dependency solving, governance checks, lock generation, and local
   materialization
-- PostgreSQL as the canonical runtime store for registry metadata, content,
+- A Next.js website at [aptitude-registry.dev](https://aptitude-registry.dev) for
+  catalog browsing, skill inspection, and install instructions
+- PostgreSQL (Neon) as the canonical runtime store for registry metadata, content,
   lifecycle state, provenance snapshots, and audit records
 - A documentation and operations layer that defines architecture, contracts,
   contributor workflows, and runbooks
@@ -105,7 +109,7 @@ flowchart LR
     Publisher --> Registry["Aptitude Registry"]
     Resolver --> Registry
     Registry --> DB["PostgreSQL"]
-    Web["Future Web App"] --> Registry
+    Web["Website\naptitude-registry.dev"] --> Registry
 ```
 
 ## Why This Model
@@ -129,9 +133,9 @@ flowchart LR
 The market has tools for skill sharing, runtime capability use, and skill
 research, but most solutions only solve part of the lifecycle.
 
-- Skills marketplaces and installer-style tools help distribute skills, but usually depend on weaker governance and less reproducible installation models.
-- Runtime frameworks and model tool-calling APIs help agents use capabilities, but they are not structured registry and lifecycle systems.
-- Research systems explore skill creation and evaluation, but they are not enterprise-oriented control planes.
+- **Skills.sh**, **OpenClaw / ClawHub** — treat skills as distributable artifacts but stop short of strong governance, strict validation, and reproducible resolution.
+- **LangChain**, **OpenAI Tools / Functions** — enable capability use at runtime but are not a packaging, registry, or lifecycle system.
+- **SkillNet**, **EvoSkills** — valuable research signals, but aimed at experimentation and skill generation rather than production control.
 
 Aptitude is different because it combines a closed publication model, structured
 artifact storage, atomic dependency-aware skill composition, shareable
