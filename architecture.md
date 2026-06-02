@@ -1,264 +1,162 @@
-# Aptitude — System Architecture
+# Aptitude - System Architecture
 
-> Component map, data flows, and integration boundaries across the full Aptitude system.
+This document explains the cross-component design. Component-level details live
+in the publisher, registry, and resolver docs.
 
-## System Overview
+## Design Principle
 
-Aptitude is a three-surface system built around a strict separation of concerns. Each component owns exactly one domain and delegates everything else across a well-defined contract.
+Aptitude is built around a strict ownership boundary:
+
+| Component | Owns | Does not own |
+| --- | --- | --- |
+| Publisher | Local skill evaluation, payload assembly, bundle creation, registry upload | Registry authorization, lifecycle decisions, dependency solving |
+| Registry | Immutable facts, governance state, discovery indexes, exact reads, catalog feeds, audit | Prompt interpretation, final selection, transitive solving, lock generation |
+| Resolver | Intent handling, candidate reranking, final selection, solving, local policy, locks, materialization | Publication, authoritative metadata storage, registry governance |
+
+## System Context
 
 ```mermaid
 flowchart TD
-    Author["Skill Author / CI"]
-    Agent["Developer / Agent / MCP Host"]
+    Author["Skill author / CI"]
+    Developer["Developer / agent host"]
+    Browser["Catalog visitor"]
 
-    subgraph Publisher["aptitude-publisher (local)"]
-        PUB_PIPE["Evaluation Pipeline\ndiscovery · identity · metadata\nsecurity · validation · ranking\ndelivery · compression"]
-        PUB_CLIENT["Registry Client\nmultipart POST /skills/{slug}"]
+    subgraph Local["Local tools"]
+        Publisher["aptitude-publisher"]
+        Resolver["aptitude / aptitude mcp"]
     end
 
-    subgraph Registry["aptitude-server (hosted)"]
-        REG_IF["Interface Layer\nFastAPI routers · auth · scopes"]
-        REG_CORE["Core Services\nregistry · discovery · search · fetch\ngovernance · audit · embedding indexer"]
-        REG_DB[("PostgreSQL\nversions · metadata · content\nembeddings · co-usage · audit")]
+    subgraph Hosted["Hosted services"]
+        Website["Next.js website\naptitude-registry.dev"]
+        Registry["Aptitude Registry API\napi.aptitude-registry.dev"]
+        DB[("PostgreSQL\nNeon")]
     end
 
-    subgraph Resolver["aptitude-resolver (local)"]
-        RES_DISC["Discovery\nintent parsing · query builder · reranking"]
-        RES_SOLVE["Resolution\nversion selection · graph expansion · conflict detection"]
-        RES_GOV["Governance\ntwo-phase policy evaluation"]
-        RES_EXEC["Execution\nlock replay · materialize · verify"]
-        RES_IF["Interfaces\nCLI (Typer) · MCP (FastMCP stdio)"]
-    end
+    Author --> Publisher
+    Publisher -->|"POST /skills/{slug}\nmetadata + skill.tar.zst"| Registry
 
-    Author --> PUB_PIPE
-    PUB_PIPE --> PUB_CLIENT
-    PUB_CLIENT -- "POST /skills/{slug}\nmultipart/form-data" --> REG_IF
+    Developer --> Resolver
+    Resolver -->|"POST /discovery\nGET /skills\nGET /resolution\nGET content"| Registry
 
-    Agent --> RES_IF
-    RES_IF --> RES_DISC
-    RES_DISC -- "POST /discovery" --> REG_IF
-    RES_SOLVE -- "GET /skills · GET /resolution" --> REG_IF
-    RES_EXEC -- "GET /skills/{slug}/{version}/content" --> REG_IF
+    Browser --> Website
+    Website -->|"server-side catalog reads"| Registry
 
-    REG_IF --> REG_CORE
-    REG_CORE --> REG_DB
+    Registry --> DB
 ```
 
----
+## Main Data Flows
 
-## Component Breakdown
-
-### Publisher
-
-The publisher is a local Python CLI process (`aptitude-publisher`). It has no server component and no persistent state. Each run executes a fixed 9-stage pipeline: **discovery → identity → metadata → security → validation → performance exam → ranking → delivery → compression**.
-
-Five gates intercept the pipeline between critical stages. A gate failure halts execution immediately and prevents upload.
-
-External evaluators:
-- **NVIDIA garak** — security scanning. Mandatory; no fallback. Unconfigured or unscored → publish blocked.
-- **Hugging Face Upskill** — performance measurement. Optional; if unavailable, performance score defaults to 0.
-
-The publisher writes a numbered JSON artifact per stage to `.publisher_artifacts/` inside the skill folder, giving a full local audit trail of every evaluation run.
-
-### Registry
-
-The registry is a stateless FastAPI service backed by PostgreSQL. It is the only component that writes to the database. It is the authoritative source for:
-
-- Immutable skill artifacts (`.tar.zst` bytes, SHA-256 content digest)
-- Skill metadata, tags, schemas, token estimates
-- Governance state: trust tier, namespace, lifecycle status, review state, promotion channel
-- Discovery indexes: PostgreSQL `tsvector` GIN index + pgvector HNSW index (`halfvec(1536)`) for semantic search
-- Co-usage signals: pre-computed lift scores from `skill_co_usage_pairs`
-- Audit events for every publish, lifecycle change, and discovery query
-
-### Resolver
-
-The resolver is a local Python process (`aptitude-resolver`). It has no server component. All state it writes is the `aptitude.lock.json` lockfile and materialized skill files in the target directory.
-
-The resolver has four functional layers that never overlap:
-
-| Layer | Does |
-| --- | --- |
-| Discovery | Parses intent, builds registry query, shapes and reranks the candidate list |
-| Resolution | Selects one version per slug, expands dependency graph recursively, detects conflicts |
-| Governance | Filters policy-violating candidates before selection; validates the full graph before lock |
-| Execution | Reads install order from lockfile, downloads, verifies checksums, extracts safely, promotes workspace |
-
----
-
-## Data Flows
-
-### Publish Flow
+### Publish
 
 ```mermaid
 sequenceDiagram
     participant Author as Author / CI
-    participant Pub as aptitude-publisher
-    participant Garak as NVIDIA garak
-    participant Upskill as HF Upskill
-    participant Reg as aptitude-server
+    participant Pub as Publisher
+    participant Garak as garak
+    participant Upskill as Upskill
+    participant Reg as Registry
     participant DB as PostgreSQL
 
     Author->>Pub: aptitude-publisher publish /skill
-    Pub->>Pub: discovery + identity + metadata stages
-    Pub->>Garak: run security scan
-    Garak-->>Pub: GarakSecurityResult (score, findings)
-    Pub->>Pub: validation stage (Anthropic compliance)
-    Pub->>Upskill: run performance evaluation
-    Upskill-->>Pub: UpskillEvaluation (lift, token delta)
-    Pub->>Pub: ranking stage → publish_decision
-    Note over Pub: block if decision == "block"
-    Pub->>Reg: POST /skills/{slug}\n(metadata JSON + .tar.zst bundle)
-    Reg->>Reg: auth · schema validation · governance
-    Reg->>Reg: SHA-256 digest · version checksum
-    Reg->>DB: write skill_versions · skill_contents\nskill_search_documents · audit_events
-    Reg-->>Pub: 201 + metadata
+    Pub->>Pub: discovery, identity, metadata
+    Pub->>Garak: security scan
+    Garak-->>Pub: scored findings or blocking failure
+    Pub->>Pub: Anthropic validation
+    Pub->>Upskill: optional performance evaluation
+    Upskill-->>Pub: score or unavailable
+    Pub->>Pub: ranking, delivery payload, bundle
+    Pub->>Reg: POST /skills/{slug}
+    Reg->>Reg: auth, schema validation, governance
+    Reg->>DB: store version, content, metadata, selectors, search rows, audit
+    Reg-->>Pub: registry response
 ```
 
-### Discovery and Resolution Flow
+### Discovery and Resolution
 
 ```mermaid
 sequenceDiagram
-    participant User as Developer / Agent
-    participant Res as aptitude-resolver
-    participant Reg as aptitude-server
+    participant User as User / Agent
+    participant Res as Resolver
+    participant Reg as Registry
     participant DB as PostgreSQL
 
-    User->>Res: aptitude install "review FastAPI PRs"
-    Res->>Res: intent parsing → SearchIntent
-    Res->>Reg: POST /discovery\n(name, description, tags, context_skills)
-    Reg->>DB: tsvector GIN search\n+ optional HNSW semantic search\n+ co-usage boost lookup
+    User->>Res: aptitude install "query"
+    Res->>Res: parse intent and build search request
+    Res->>Reg: POST /discovery
+    Reg->>DB: lexical search, semantic search, co-usage boost, governance filter
     DB-->>Reg: candidate rows
-    Reg->>Reg: RRF fusion + governance filter
-    Reg-->>Res: ordered slug list
-
-    loop for each candidate slug
-        Res->>Reg: GET /skills/{slug}
-        Reg-->>Res: version list
-        Res->>Reg: GET /skills/{slug}/{version}
-        Reg-->>Res: immutable metadata
-    end
-
-    Res->>Res: Phase 1 governance (filter policy violations)
-    Res->>Res: profile-aware reranking + root selection
-    Res->>Res: recursive graph resolution\n(GET /resolution/{slug}/{version} per dependency)
-    Res->>Res: Phase 2 governance (graph-level validation)
-    Res->>Res: lockfile generation → aptitude.lock.json
-
-    loop for each locked skill (install_order)
-        Res->>Reg: GET /skills/{slug}/{version}/content
-        Reg-->>Res: .tar.zst bytes
-        Res->>Res: SHA-256 verify → safe extract → promote
-    end
-
-    Res-->>User: materialized skill files + execution plan
+    Reg-->>Res: ordered candidate slugs
+    Res->>Reg: GET /skills/{slug} and exact versions
+    Res->>Res: candidate policy filter, rerank, select root
+    Res->>Reg: GET /resolution/{slug}/{version}
+    Res->>Res: solve graph and run graph governance
+    Res->>Res: write aptitude.lock.json
+    Res->>Reg: GET /skills/{slug}/{version}/content
+    Res->>Res: verify checksum, extract, promote
 ```
 
-### Lock Replay Flow
+### Lock Replay
 
 ```mermaid
 flowchart LR
-    Lock["aptitude.lock.json"] --> Parse["Parse lockfile"]
-    Parse --> Plan["Derive ExecutionPlan\nfrom install_order"]
-    Plan --> Fetch["GET /skills/{slug}/{version}/content\nper locked skill"]
-    Fetch --> Verify["SHA-256 verify\n(compressed bytes)"]
-    Verify --> Extract["Safe tar.zst extraction"]
-    Extract --> Promote["Workspace promotion"]
+    Lock["aptitude.lock.json"] --> Parse["Parse lock"]
+    Parse --> Plan["Build execution plan\nfrom install_order"]
+    Plan --> Fetch["Fetch exact artifacts"]
+    Fetch --> Verify["Verify compressed-byte checksums"]
+    Verify --> Extract["Safe extract into staging"]
+    Extract --> Promote["Promote target files"]
 ```
 
-Discovery, intent parsing, candidate selection, and dependency solving do not run during lock replay. The lock is the sole execution source of truth.
+Lock replay skips discovery, ranking, and dependency solving. The lockfile is
+the execution source of truth.
 
----
+## Storage Model
 
-## Discovery Pipeline (Registry Detail)
+The registry is the only component with a database. PostgreSQL stores:
 
-The registry's `POST /discovery` endpoint runs a hybrid signal pipeline before returning candidates.
+- Skills and immutable versions.
+- Opaque `.tar.zst` bundle bytes and SHA-256 content digests.
+- Canonical version checksums.
+- Metadata, tags, schemas, token/content estimates, and provenance.
+- Direct authored dependency selectors.
+- Search projections for lexical, semantic, and co-usage discovery.
+- Governance state: namespace, trust tier, lifecycle, review state, promotion
+  channel, ownership, policy packs, and trust evidence.
+- Audit events for mutating operations and discovery/search activity.
 
-```mermaid
-flowchart TD
-    REQ["POST /discovery\nname · description · tags · context_skills"]
-    NORM["1. Normalize\nquery_text · effective_tags · semantic_text"]
+Resolver lockfiles and execution plans are local outputs. Publisher artifacts
+are local audit traces under `.publisher_artifacts/` in the skill folder.
 
-    subgraph Signals["Signal Retrieval"]
-        direction LR
-        LEX["2. Lexical Search\nskill_search_documents\ntsvector GIN index"]
-        SEM["3. Semantic Search\nOpenAI Embeddings → pgvector HNSW\n(mode = on or shadow)"]
-        COU["4. Co-usage Boosts\nskill_co_usage_pairs\n(CO_USAGE_RANKING_ENABLED + context_skills)"]
-    end
+## API Surface By Consumer
 
-    FUSE["5. Candidate Fusion\nRRF score: 1/(rank+60)\n+ co-usage boost"]
-    GOV["6. Governance Filter\nlifecycle · namespace · trust · channel · policy pack"]
-    RESP["Response\ncandidates: ordered slug list"]
+| Consumer | Registry routes |
+| --- | --- |
+| Publisher | `POST /skills/{slug}` |
+| Resolver | `POST /discovery`, `GET /skills/{slug}`, `GET /skills/{slug}/{version}`, `GET /resolution/{slug}/{version}`, `GET /skills/{slug}/{version}/content` |
+| Website | `GET /catalog/skills`, `GET /catalog/top-skills`, `GET /catalog/skill-graph`, `POST /catalog/search` |
+| Telemetry bridge | `POST /catalog/star-events`, `GET /catalog/user-stars` |
+| Operators | `GET /healthz`, `GET /readyz` |
+| Admin/review | organization, namespace, ownership, governance, policy-pack, lifecycle, and trust-evidence endpoints |
 
-    REQ --> NORM
-    NORM --> LEX
-    NORM --> SEM
-    NORM --> COU
-    LEX --> FUSE
-    SEM --> FUSE
-    COU --> FUSE
-    FUSE --> GOV
-    GOV --> RESP
+All protected registry calls use service tokens of the form:
+
+```text
+Authorization: Bearer <token_id>.<token_secret>
 ```
 
-Three semantic discovery modes are supported: `off` (default, lexical only), `shadow` (semantic runs but results are discarded — used for A/B validation), and `on` (lexical + semantic fused).
+## Operations Model
 
----
+- Registry runs on Render and stores production data in Neon PostgreSQL.
+- Migrations are Alembic-driven and use `MIGRATION_DATABASE_URL` when present.
+- Semantic embeddings are indexed asynchronously by operator/workflow scripts.
+- Registry observability uses structured logs plus OpenTelemetry export to
+  Grafana Cloud when enabled.
+- Website calls the registry server-side; browsers do not call registry APIs
+  directly.
 
-## Governance Boundary
+## Design Files
 
-Each component enforces governance at a different layer. The responsibilities do not overlap.
-
-```mermaid
-flowchart LR
-    subgraph PublisherGov["Publisher Governance"]
-        PG1["Security: NVIDIA garak\n(must score, blocking)"]
-        PG2["Compliance: Anthropic SKILL.md rules\n(errors = block)"]
-        PG3["Governance inputs declared\ntrust_tier · namespace · artifact_origin"]
-    end
-
-    subgraph RegistryGov["Registry Governance"]
-        RG1["Auth: scoped token checks\n(read · publish · review · admin)"]
-        RG2["Trust tier rules per namespace"]
-        RG3["Lifecycle enforcement\npublished → deprecated → archived"]
-        RG4["Policy packs · promotion channels\nreview state"]
-        RG5["Audit events on every mutating operation"]
-    end
-
-    subgraph ResolverGov["Resolver Governance (two-phase)"]
-        RV1["Phase 1: candidate filtering\n(pre-selection policy check)"]
-        RV2["Phase 2: graph validation\n(pre-lock aggregate check)"]
-        RV3["Checksum verification\n(SHA-256 on compressed bytes)"]
-        RV4["Policy config layers\naptitude.toml: system · user · workspace · request"]
-    end
-
-    PublisherGov --> RegistryGov --> ResolverGov
-```
-
-No component can grant permissions that another component is designed to enforce. A skill passing all publisher gates may still be rejected by the registry if the caller's token lacks the required scope.
-
----
-
-## Technology Stack Summary
-
-| Component | Language | Key Dependencies |
-| --- | --- | --- |
-| Publisher | Python 3.10+ | argparse, zstandard, garak (optional), upskill (optional) |
-| Registry | Python 3.10+ | FastAPI, SQLAlchemy, pgvector, OpenAI Embeddings API (optional) |
-| Resolver | Python 3.10+ | Typer, Rich, FastMCP (stdio), Pydantic |
-| Storage | — | PostgreSQL 15+ with pgvector extension |
-
----
-
-## Deployment Model
-
-**Current MVP:**
-- Registry deployed as a long-running service (Cloud Run or GKE + Cloud SQL).
-- Publisher runs locally or in CI pipelines; no server required.
-- Resolver runs locally or in CI pipelines; no server required.
-
-**Future:**
-- Optional async worker tier for post-commit side effects (embedding indexing, notifications).
-- Web UI as a presentation layer over the same registry APIs — no new sources of truth.
-
-All three components communicate only through the registry's public HTTP API. No component reads or writes the PostgreSQL database directly except the registry.
+- [High-Level Design](high-level-design.md)
+- [Publisher Architecture](publisher/architecture.md)
+- [Registry Architecture](registry/architecture.md)
+- [Resolver Architecture](resolver/architecture.md)

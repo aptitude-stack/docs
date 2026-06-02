@@ -1,112 +1,84 @@
-# Aptitude Registry — Product Overview
+# Aptitude Registry - Product Overview
 
-> Canonical product description for the Aptitude Registry service.
+The Aptitude Registry is the hosted backend for immutable skill publication,
+discovery, exact fetch, catalog data, governance, and audit. It is the only
+Aptitude component that writes to PostgreSQL.
 
-## What It Is
+The registry stores facts. It does not decide which skill a local user should
+install.
 
-Aptitude Registry is the authoritative skill catalog backend in the Aptitude ecosystem. It is a control-first service: every piece of data it manages is immutable once written, digest-addressed, and governed by an explicit policy model before it is visible to callers.
+## Users
 
-Publishers (CI pipelines, human authors, automated agents) push versioned skill bundles to the registry. Resolvers, MCP clients, and CLI tools query the registry to discover candidate skills, read exact metadata, fetch immutable bundle artifacts, and retrieve direct dependency selectors. The registry never interprets intent, never selects a final skill set, and never builds execution plans — those responsibilities belong entirely to the caller.
+| User/system | Goal |
+| --- | --- |
+| Publisher / CI | Publish a new immutable skill version. |
+| Resolver / MCP / CLI | Discover candidate slugs, fetch exact metadata, read direct dependency selectors, and download artifact bytes. |
+| Website | Read catalog listings, search results, graph data, and star state server-side. |
+| Operators | Run migrations, check readiness, rotate service tokens, index embeddings, inspect observability. |
+| Reviewers/admins | Manage namespaces, organizations, policy packs, ownership, trust evidence, lifecycle, review state, and promotion channels. |
 
-## What the Registry Owns
+## What It Owns
 
-- **Immutable publication.** Each `slug@version` is written once as a digest-addressed `.tar.zst` bundle. Artifact bytes are never patched after publication; a new version must be published if content changes.
-- **Discovery candidate generation.** The `POST /discovery` endpoint returns an ordered list of candidate slugs using a hybrid lexical + semantic + co-usage ranking pipeline. It does not perform final selection.
-- **Exact dependency reads.** `GET /resolution/{slug}/{version}` returns the direct authored `depends_on` selectors for one exact coordinate. Transitive graph resolution is a resolver concern.
-- **Exact metadata and content fetch.** Callers can retrieve immutable structured metadata or the raw bundle artifact for any coordinate they already know.
-- **Lifecycle governance.** Skills move through `published → deprecated → archived` under policy-enforced transitions. Only callers with the `admin` scope may trigger a transition.
-- **Enterprise control plane.** Namespaces, organizations, policy packs, review states, promotion channels, and trust-tier classification are managed via admin-gated endpoints.
-- **Audit.** Every publish, lifecycle transition, search, and governance change is recorded in a structured audit log.
-- **Operational telemetry.** Health probes, readiness checks, structured logs, and OTLP metrics are exported to Grafana Cloud when `OTEL_ENABLED=true`.
+- Immutable `slug@version` records.
+- Digest-addressed `.tar.zst` artifact bytes.
+- Metadata, tags, schemas, token/content estimates, and provenance snapshots.
+- Direct authored dependency selectors.
+- Lexical search projections and semantic embedding rows.
+- Co-usage and catalog ranking signals.
+- Lifecycle status, trust tier, namespace, review state, promotion channel, and
+  policy pack attachment.
+- Service-token authentication and route-scope enforcement.
+- Audit records for publishes, governance changes, and discovery/search events.
+- Health, readiness, structured logging, and OpenTelemetry metrics export.
 
-## What the Registry Does Not Own
+## What It Does Not Own
 
-| Concern | Owned by |
+| Concern | Owner |
 | --- | --- |
 | Prompt interpretation | Resolver / client |
-| Re-ranking search results | Resolver / client |
+| Client-side candidate reranking | Resolver / client |
 | Final skill selection | Resolver / client |
-| Transitive dependency solving | Resolver / client |
-| Lock file generation | Resolver / client |
-| Execution planning | Resolver / client |
-| Runtime execution | Agent runtime |
+| Transitive dependency solving | Resolver |
+| Lock generation | Resolver |
+| Local materialization and execution | Resolver / agent host |
 
-This boundary is strict and intentional. The registry is a single source of truth for *what exists and what was declared*; everything downstream is the caller's responsibility.
+## Route Families
 
-## Technology Stack
-
-| Component | Choice |
+| Category | Routes |
 | --- | --- |
-| Language | Python 3.12+ |
-| Web framework | FastAPI |
-| Validation | Pydantic |
-| ORM / query | SQLAlchemy |
-| Migrations | Alembic |
-| Database | PostgreSQL (sole authoritative store) |
-| Vector search | pgvector (`halfvec`, HNSW index) |
-| Semantic embeddings | OpenAI Embeddings API |
-| Bundle format | `.tar.zst` (`application/zstd`) |
-| Package manager | uv |
-| Linting / formatting | Ruff |
-| Testing | pytest |
-| Observability | Prometheus → Grafana Cloud (OTLP/HTTP) + Loki |
-| Container | Docker / Docker Compose |
-
-## Quick Start
-
-Requirements: Python 3.12+, `uv`, Docker.
-
-```bash
-# Install dependencies
-uv sync --extra dev
-
-# Start the local stack with demo data (APP_ENV=dev)
-make run-dev
-
-# Run integration tests (uses a separate DB on port 5433)
-make test
-```
-
-Local URLs once running:
-
-- API: `http://127.0.0.1:8000`
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- Grafana dashboard: `http://127.0.0.1:3000`
-
-For production-like startup (no demo seed):
-
-```bash
-make run-prod
-```
-
-Teardown:
-
-```bash
-docker compose down -v
-```
-
-## Route Surface at a Glance
-
-| Category | Key endpoints |
-| --- | --- |
-| Health | `GET /healthz`, `GET /readyz` |
+| Public status | `GET /`, `GET /favicon.svg`, `GET /healthz`, `GET /readyz` |
 | Publish | `POST /skills/{slug}` |
 | Discovery | `POST /discovery` |
-| Resolution | `GET /resolution/{slug}/{version}` |
-| Exact fetch | `GET /skills/{slug}/{version}`, `GET /skills/{slug}/{version}/content` |
-| Identity listing | `GET /skills/{slug}` |
-| Lifecycle | `PATCH /skills/{slug}/{version}/status` |
-| Catalog (website) | `GET /catalog/top-skills`, `GET /catalog/skill-graph`, `POST /catalog/search` |
-| Stars | `POST /catalog/star-events`, `GET /catalog/user-stars` |
-| Admin | `/admin/organizations`, `/admin/namespaces`, `/admin/policy-packs/{slug}`, etc. |
+| Exact reads | `GET /skills/{slug}`, `GET /skills/{slug}/{version}`, `GET /resolution/{slug}/{version}`, `GET /skills/{slug}/{version}/content` |
+| Catalog | `GET /catalog/skills`, `GET /catalog/top-skills`, `GET /catalog/skill-graph`, `POST /catalog/search` |
+| Stars/telemetry | `POST /catalog/star-events`, `GET /catalog/user-stars` |
+| Governance | lifecycle, organization, namespace, ownership, trust evidence, policy-pack, review-state, and promotion-channel endpoints |
 
-Full contract details live in [`reference/api-contract.md`](reference/api-contract.md).
+## Stack
 
-## Key Reading Order
+| Layer | Technology |
+| --- | --- |
+| Runtime | Python 3.12+, FastAPI, Pydantic |
+| Persistence | PostgreSQL, SQLAlchemy, Alembic |
+| Search | PostgreSQL full-text search, pgvector HNSW, OpenAI embeddings |
+| Artifacts | `.tar.zst`, `application/zstd`, SHA-256 checksums |
+| Operations | Docker, Render, Neon, OpenTelemetry, Grafana Cloud, Loki |
+| Tooling | uv, Ruff, pytest |
 
-1. This document — product scope and ownership boundary.
-2. [`architecture.md`](architecture.md) — system design and layer breakdown.
-3. [`discovery-mechanism.md`](discovery-mechanism.md) — how hybrid search works.
-4. [`tables.md`](tables.md) — PostgreSQL schema reference.
-5. [`policies.md`](policies.md) — governance model and policy evaluation.
-6. [`reference/api-contract.md`](reference/api-contract.md) — canonical HTTP contract.
+## Local Commands
+
+```bash
+uv sync --extra dev
+make run-dev      # dev stack with demo seed
+make run-prod     # production-like stack without demo seed
+make quality
+make test
+make rotate       # service-token generator
+```
+
+## Reading Order
+
+1. [Architecture](architecture.md)
+2. [Discovery Mechanism](discovery-mechanism.md)
+3. [Policies](policies.md)
+4. [Tables](tables.md)

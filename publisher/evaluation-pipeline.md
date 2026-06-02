@@ -22,7 +22,7 @@ flowchart TD
     P["Stage 5: Performance Exam\nHugging Face Upskill"]
     R["Stage 6: Ranking\nWeighted quality score + publish decision"]
     DEL["Stage 7: Delivery\nRegistry payload assembly"]
-    C["Stage 8: Compression\nZstandard .tar.zst bundle"]
+    C["Stage 8: Compression\nlocal delivery-package artifact"]
     OUT["PublishContext\n.publisher_artifacts/"]
 
     HALT["Pipeline halted\n(gate failure)"]
@@ -101,12 +101,17 @@ Fields extracted from frontmatter:
 
 Publisher-computed fields (not from frontmatter):
 
-- **`token_estimate`** — content heuristic: `max(len(text)/4, word_count × 1.3)`. This is a provisional estimate only; it is replaced by `performance_exam.skilled_avg_tokens` when Upskill runs successfully.
+- **`token_estimate`** — content heuristic:
+  `max(1, int(round(max(len(text) / 4, word_count * 1.3))))`. This is a
+  provisional estimate only; it is replaced by
+  `performance_exam.skilled_avg_tokens` when Upskill runs successfully.
 - **`word_count`** — counted from the SKILL.md body plus companion markdown files.
 
 Optional enrichment: GitHub repository signals (star count, forks, etc.) are fetched via `github_api.fetch_repository_signals` and stored in `metadata.extra.repo_signals` if a repo URL was discovered.
 
-**MetadataGate** blocks if `name`, `description`, or `tags` is absent.
+**MetadataGate** blocks if `name`, `description`, `tags`, `inputs_schema`, or
+`outputs_schema` is absent. It also blocks if `maturity_score` or
+`security_score` is present but outside `0.0` to `1.0`.
 
 ---
 
@@ -371,7 +376,7 @@ After a complete pipeline run, `.publisher_artifacts/` inside the skill folder c
   02_metadata.json           # Stage 2 — metadata fields + token estimate
   03_ranking.json            # Stage 6 — weighted scores + publish decision
   04_security.json           # Stage 3 — garak findings + decision
-  05_validation.json         # Stage 5 — errors, warnings, checks run
+  05_validation.json         # Stage 4 — errors, warnings, checks run
   05_performance_exam.json   # Stage 5 — Upskill metrics
   07_compression.json        # Stage 8 — compression stats
   07_delivery_package.zst    # Stage 8 — compressed delivery payload

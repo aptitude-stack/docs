@@ -1,235 +1,122 @@
-# Aptitude Registry — Architecture
+# Aptitude Registry - Architecture
 
-> System design, layer breakdown, and API overview.
+The registry is a layered FastAPI service backed by PostgreSQL. PostgreSQL is
+the sole authoritative runtime store. Semantic search and observability are
+external integrations, not additional sources of truth.
 
-## System Overview
-
-The registry is a small, layered service centred on PostgreSQL. It has no external state stores, caches, or message queues in its critical path — PostgreSQL is the sole authoritative runtime store. Optional semantic search adds an OpenAI Embeddings call at query time, but that path degrades gracefully to lexical-only on failure.
+## Runtime Shape
 
 ```mermaid
 flowchart TD
-    CI["Publisher / CI"]
-    MCP["Resolver / MCP"]
-    OPS["Ops / Observability"]
+    Pub["Publisher / CI"]
+    Res["Resolver / MCP / CLI"]
+    Web["Website server"]
+    Ops["Ops"]
 
     subgraph Registry["Aptitude Registry"]
-        direction TB
-        IF["**Interface layer** _(FastAPI)_\npublish · discovery · resolution · fetch\nlifecycle · catalog · admin · telemetry"]
-        CORE["**Core services**\nregistry · discovery · search · fetch\ngovernance · audit · embedding indexing"]
-        PA["**Persistence adapters**\nSQLAlchemy repositories · audit recorder"]
-        PG[("**PostgreSQL**\nversions · metadata · content · search\nembeddings · co-usage · audit · governance")]
-
-        IF --> CORE --> PA --> PG
+        IF["Interface\nFastAPI routers, DTOs, auth, errors"]
+        Core["Core services\nregistry, discovery, fetch, resolution,\ngovernance, telemetry, embedding indexing"]
+        Intel["Intelligence\nnormalization, RRF fusion, explanations"]
+        Persist["Persistence\nSQLAlchemy repositories, audit recorder"]
+        Obs["Observability\nlogs, metrics, health, readiness"]
     end
 
-    CI -- "POST /skills/{slug}" --> IF
-    MCP <-- "POST /discovery\nGET /resolution\nGET /skills" --> IF
-    OPS <-- "GET /healthz · GET /readyz\nOTLP metrics" --> IF
+    DB[("PostgreSQL")]
+
+    Pub --> IF
+    Res --> IF
+    Web --> IF
+    Ops --> Obs
+    IF --> Core
+    Core --> Intel
+    Core --> Persist
+    Persist --> DB
+    Core --> Obs
 ```
 
-## Layer Breakdown
+## Interface Layer
 
-### Interface Layer
+FastAPI routers parse requests, authenticate service tokens, enforce route
+scopes, translate DTOs, attach request IDs, and return stable error envelopes.
 
-`app/interface/` — FastAPI routers and Pydantic DTOs.
+Important route modules:
 
-Responsibilities:
-- Authenticate every protected request using the service-token scheme (`Authorization: Bearer <id>.<secret>`).
-- Parse and validate request shapes; translate to core domain commands/queries.
-- Enforce route-level scope checks (`read`, `publish`, `review`, `admin`, `telemetry`) before forwarding to core services.
-- Translate domain errors (`SkillNotFoundError`, `PolicyViolation`, etc.) into stable JSON error envelopes.
-- Attach `X-Request-ID` correlation headers on all responses.
+- `skills.py` - publish, version listing, exact metadata, lifecycle.
+- `discovery.py` - resolver discovery.
+- `fetch.py` - exact content fetch and catalog surfaces.
+- `resolution.py` - direct dependency selector reads.
+- `enterprise.py` - organization, namespace, policy, review, and trust evidence.
+- `telemetry.py` - star events and user-star reads.
+- `health.py` and `root.py` - status and root UI.
 
-Key modules: `skills.py` (publish + exact reads), `discovery.py`, `resolution.py`, `fetch.py`, `health.py`, `enterprise.py`, `telemetry.py`.
+## Core Services
 
-### Core Services
+The core layer owns domain behavior:
 
-`app/core/` — domain logic, pure and port-driven.
-
-The core layer never imports from the interface or persistence layers. It depends only on abstract port interfaces defined in `app/core/ports.py`.
-
-| Module | Responsibility |
+| Service/module | Responsibility |
 | --- | --- |
-| `skills/registry.py` | Immutable publish workflow — hash checking, governance evaluation, storage coordination |
-| `skills/discovery.py` | Discovery facade — narrows search output to ordered slug lists |
-| `skills/search.py` | `SkillSearchService` — hybrid lexical + semantic + co-usage candidate retrieval |
-| `skills/exact_read.py` | Exact metadata and version-list reads with governance visibility checks |
-| `skills/fetch.py` | Exact content fetch — returns immutable `.tar.zst` bytes |
-| `skills/resolution.py` | Direct `depends_on` selector reads for one exact coordinate |
-| `skills/embedding_indexing.py` | Background embedding backfill and index status management |
-| `skills/bundle_archive.py` | Bundle structure validation at publish time |
-| `governance.py` | `GovernancePolicy` — evaluates publish rules, lifecycle transitions, visibility, and namespace grants |
-| `auth.py` | Token authentication and `CallerIdentity` construction |
-| `settings.py` | Environment-driven configuration and `SemanticDiscoveryMode` |
+| Skill registry | Immutable publish workflow, checksum calculation, storage coordination. |
+| Discovery/search | Candidate generation using lexical, semantic, and co-usage signals. |
+| Exact read/fetch | Visible metadata and exact `.tar.zst` content reads. |
+| Resolution | Direct `depends_on` selector reads for one exact coordinate. |
+| Governance | Scope, namespace, lifecycle, review, promotion, trust-tier, and policy-pack decisions. |
+| Telemetry | Star/unstar aggregation and per-user star state. |
+| Embedding indexing | Pending/stale semantic embedding backfill. |
+| Audit | Structured audit events for important reads and all mutating operations. |
 
-### Intelligence Layer
+## Persistence Model
 
-`app/intelligence/` — pure ranking and signal helpers.
+The registry persists:
 
-| Module | Responsibility |
-| --- | --- |
-| `discovery_signals.py` | RRF-based candidate fusion, embedding source/checksum building, co-usage boost application |
-| `search_ranking.py` | Request normalization, explanation field construction, audit payload building |
+- `skills` and `skill_versions` for identity and immutable version records.
+- `skill_contents` for raw bundle bytes and content digest.
+- `skill_metadata` for structured metadata.
+- `skill_relationship_selectors` for direct authored dependency selectors.
+- `skill_search_documents` for full-text and catalog search projection.
+- `skill_search_embeddings` for pgvector-backed semantic search.
+- co-usage tables for optional boost signals.
+- governance tables for organizations, namespaces, policy packs, ownership, and
+  trust evidence.
+- audit tables for publish, governance, and discovery/search events.
 
-### Integrations Layer
+## Discovery Design
 
-`app/integrations/` — thin wrappers around external services.
+Discovery is a candidate-generation API. It returns ordered slugs, not final
+runtime decisions. The resolver is expected to fetch metadata, apply local
+policy, rerank, select, solve, and lock.
 
-- `openai_embeddings.py` — calls the OpenAI Embeddings API to produce query vectors at search time. Only used when `SEMANTIC_DISCOVERY_MODE` is `on` or `shadow`.
+The registry pipeline:
 
-### Persistence Adapters
+1. Normalize request text and tags.
+2. Search `skill_search_documents` with PostgreSQL full-text search and
+   SQL-level visibility predicates.
+3. Optionally run semantic search over `skill_search_embeddings` with the same
+   visibility predicates.
+4. Optionally apply co-usage boosts from `skill_co_usage_pairs`.
+5. Fuse ranked lists with RRF plus bounded boosts.
+6. Apply final governance visibility checks to the fused list.
+7. Record a redacted audit event.
 
-`app/` persistence modules — SQLAlchemy ORM models and repository implementations that satisfy the port interfaces defined in core.
+See [Discovery Mechanism](discovery-mechanism.md).
 
-The main port contract is `SkillDiscoverySearchPort`, which exposes:
-- `search_candidates` — lexical full-text search over `skill_search_documents`
-- `search_semantic_candidates` — HNSW cosine search over `skill_search_embeddings`
-- `get_co_usage_boosts` — co-usage lift scores from `skill_co_usage_pairs`
+## Governance Design
 
-### Operations
+Every protected request is authenticated with:
 
-`app/observability/` — metrics, structured logging, and health probes.
-
-- Health: `GET /healthz` (liveness), `GET /readyz` (dependency check: DB connectivity + migration state).
-- Metrics: OTLP/HTTP export to Grafana Cloud when `OTEL_ENABLED=true`. Legacy `/metrics` endpoint removed after migration 11.
-- Logs: structured JSON via stdlib `logging`, shipped via Loki.
-
-## Data Flow
-
-### Publish
-
-```
-Publisher → POST /skills/{slug}   (multipart/form-data: metadata JSON + bundle bytes)
-         → Auth middleware: token lookup, scope check
-         → Interface: parse DTO, validate bundle structure
-         → Core registry service:
-             1. Evaluate publish governance (trust tier, namespace, provenance)
-             2. Compute SHA-256 content digest
-             3. Compute canonical version checksum (metadata + content digest + relationships)
-             4. Write skill_contents, skill_metadata, skill_versions, skill_relationship_selectors
-             5. Write skill_search_documents (lexical search projection)
-             6. Enqueue skill_search_embeddings row (status = pending)
-             7. Write audit_events row
-         ← 201 with exact metadata JSON
-```
-
-### Discovery
-
-```
-Resolver → POST /discovery   (name, description, tags, context_skills)
-         → Auth: read scope required
-         → Core search service:
-             1. Normalize request text and tags
-             2. Apply governance filters (statuses, trust tiers, namespaces, channels)
-             3. Run lexical search on skill_search_documents (tsvector GIN)
-             4. Optionally run semantic search on skill_search_embeddings (HNSW cosine)
-             5. Optionally fetch co-usage boosts from skill_co_usage_pairs
-             6. Fuse candidates with RRF + co-usage boost
-             7. Filter visibility per governance policy
-             8. Write search audit event
-         ← 200 with ordered slug list
-```
-
-### Exact Fetch
-
-```
-Resolver → GET /skills/{slug}/{version}/content
-         → Auth: read scope required
-         → Core fetch service:
-             1. Load skill_versions + skill_contents by (slug, version)
-             2. evaluate_exact_read_allowed (lifecycle, namespace, review state, channel, policy pack)
-         ← 200 with raw .tar.zst bytes
-              ETag: content checksum digest
-              Cache-Control: public, immutable
-```
-
-## API Overview
-
-### Authentication
-
-All protected routes require:
-
-```
+```text
 Authorization: Bearer <token_id>.<token_secret>
 ```
 
-Scopes are attached to tokens at creation time:
+Scopes determine route access. Namespace grants, lifecycle state, review state,
+promotion channel, trust tier, and policy packs determine whether a caller can
+see, publish, review, or mutate a record.
 
-| Scope | Grants |
-| --- | --- |
-| `read` | Discovery, resolution, exact fetch, version listing, catalog |
-| `publish` | Skill publication (subject to trust-tier rules) |
-| `review` | Governance review and promotion workflow updates |
-| `admin` | Lifecycle transitions, enterprise admin, all of the above |
-| `telemetry` | Star event submission and user-star listing |
+## Operations
 
-### Route Summary
+The registry exposes public liveness and readiness routes. Readiness checks
+database connectivity and migration state. Metrics are exported through
+OpenTelemetry when enabled; `/metrics` is not the current canonical monitoring
+surface.
 
-| Method | Path | Scope | Notes |
-| --- | --- | --- | --- |
-| `GET` | `/healthz` | none | Liveness probe |
-| `GET` | `/readyz` | none | DB + migration readiness |
-| `POST` | `/skills/{slug}` | `publish` | Publish `slug@version` via `multipart/form-data` |
-| `POST` | `/discovery` | `read` | Ordered candidate slugs |
-| `GET` | `/skills/{slug}` | `read` | Visible version list for one identity |
-| `GET` | `/resolution/{slug}/{version}` | `read` | Direct `depends_on` selectors |
-| `GET` | `/skills/{slug}/{version}` | `read` | Exact immutable metadata |
-| `GET` | `/skills/{slug}/{version}/content` | `read` | Exact immutable `.tar.zst` bytes |
-| `PATCH` | `/skills/{slug}/{version}/status` | `admin` | Lifecycle transition |
-| `GET` | `/catalog/top-skills` | `read` | Homepage feed (ordered by install count) |
-| `GET` | `/catalog/skill-graph` | `read` | Homepage hero relation graph |
-| `POST` | `/catalog/search` | `read` | Website search feed (card metadata) |
-| `POST` | `/catalog/star-events` | `telemetry` | Record star/unstar batch |
-| `GET` | `/catalog/user-stars` | `telemetry` | Slugs starred by a user subject |
-| `POST` | `/admin/organizations` | `admin` | Create enterprise organization |
-| `POST` | `/admin/namespaces` | `admin` | Create namespace |
-| `PUT` | `/admin/policy-packs/{slug}` | `admin` | Upsert policy pack |
-| `PATCH` | `/admin/skills/{slug}/ownership` | `admin` | Move skill to namespace |
-| `PATCH` | `/admin/skills/{slug}/{version}/governance` | `review` | Update review/promotion/trust state |
-| `POST` | `/admin/skills/{slug}/{version}/trust-evidence` | `review` | Append trust evidence |
-
-### Bundle Format
-
-Skills are published as `.tar.zst` archives (`application/zstd`). The server validates structure at publish time and enforces:
-
-- Maximum upload size: 5 MiB
-- Maximum file count: 200
-- Maximum path length per entry: 240 bytes
-
-Content is stored verbatim as binary bytes. The SHA-256 content digest is the stable identity for the artifact.
-
-### Checksums
-
-Two digests are stored per version:
-
-- **Content digest** (`content.checksum.digest`): SHA-256 of the raw stored bundle bytes.
-- **Version checksum** (`version_checksum.digest`): SHA-256 of a canonical JSON payload encoding the content digest, metadata, governance inputs, and relationships. This digest does not change when mutable enterprise workflow state is updated post-publish; audit rows carry that history instead.
-
-### Error Envelope
-
-All API errors share a stable shape:
-
-```json
-{
-  "error": {
-    "code": "POLICY_PUBLISH_FORBIDDEN",
-    "message": "Caller is not allowed to publish with the requested trust tier.",
-    "details": { "required_scope": "publish", "trust_tier": "verified" }
-  }
-}
-```
-
-## Registry vs Resolver Boundary
-
-The registry answers these questions:
-- Does this `slug@version` exist?
-- What are its exact metadata, content, and direct `depends_on` selectors?
-- Which slugs are candidates for a given intent description?
-- Is this version visible to this caller under the active governance policy?
-
-The registry never answers:
-- Which candidate should be selected?
-- What is the full transitive closure of dependencies?
-- How should this version be executed?
-
-See [`architecture/server-resolver-boundary.md`](architecture/server-resolver-boundary.md) for the detailed boundary specification.
+Migrations use Alembic and prefer `MIGRATION_DATABASE_URL` when configured. That
+URL should target a direct database connection rather than a pooled connection.

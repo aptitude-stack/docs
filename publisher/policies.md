@@ -1,171 +1,121 @@
-# Aptitude Publisher — Policies
+# Aptitude Publisher - Policies
 
-> Governance inputs, security gate rules, validation contract, and what the publisher controls vs. what the registry enforces.
+This page describes policy that the publisher enforces locally and the
+governance data it passes to the registry.
 
-## Overview
+## Boundary
 
-The publisher enforces two independent policy domains:
+| Question | Enforced by |
+| --- | --- |
+| Does the skill folder pass local discovery, identity, metadata, security, and validation gates? | Publisher |
+| Does garak produce an acceptable security result? | Publisher |
+| Does `SKILL.md` satisfy publisher validation rules? | Publisher |
+| Is this caller allowed to publish to a namespace/trust tier? | Registry |
+| Is the service token valid and scoped for publish? | Registry |
+| Is lifecycle/review/promotion state valid? | Registry |
+| Is the uploaded bundle stored with correct checksums? | Registry |
 
-- **Security policy** — hard gate enforced by NVIDIA garak. Cannot be bypassed. A `block` decision from garak halts the pipeline before upload.
-- **Anthropic compliance** — structural and content rules for `SKILL.md`. Violations are errors that block the `ValidationGate`. Warnings are advisory.
-
-Governance metadata (trust tier, namespace, artifact origin, etc.) is not enforced by the publisher — it is passed through to the registry, which applies its own governance checks on receive.
-
----
+The publisher cannot grant registry permissions and cannot override registry
+governance.
 
 ## Governance Inputs
 
-Governance inputs are caller-provided via CLI flags. They are never derived from skill content and are not validated by the publisher beyond being placed in the delivery payload.
+The publisher accepts these caller-provided values:
 
-| Field | CLI Flag | Default | Description |
-| --- | --- | --- | --- |
-| `trust_tier` | `--trust-tier` | `untrusted` | Registry trust tier: `untrusted`, `internal`, or `verified`. Determines which callers can publish this skill. |
-| `namespace` | `--namespace` | `public` | Target registry namespace. |
-| `artifact_origin` | `--artifact-origin` | `internal` | Origin classification: `internal`, `imported`, `verified`, or `restricted`. |
-| `policy_pack_slug` | `--policy-pack-slug` | `null` | Optional policy pack the skill is subject to. |
-| `publisher_identity` | `--publisher-identity` | `null` | Optional identity string for provenance records (CI service account name, user, etc.). |
+| Field | CLI flag | Default |
+| --- | --- | --- |
+| `trust_tier` | `--trust-tier` | `untrusted` |
+| `namespace` | `--namespace` | `public` |
+| `artifact_origin` | `--artifact-origin` | `internal` |
+| `policy_pack_slug` | `--policy-pack-slug` | unset |
+| `publisher_identity` | `--publisher-identity` | unset |
 
-These values appear verbatim in the `governance` block of the registry payload. The registry validates them against its own namespace grants, trust-tier rules, and policy-pack configuration when the upload is received.
+These values are included in the registry payload. They are not inferred from
+skill content.
 
-### Provenance
-
-When the skill folder is inside a git repository, the publisher automatically includes `repo_url`, `commit_sha`, and `tree_path` in the `governance.provenance` block. Provenance is informational; the registry does not require it but records it when present.
-
----
+When git provenance is available, the publisher also includes repository URL,
+commit SHA, and tree path as provenance data.
 
 ## Security Policy
 
-### Mandatory garak requirement
+NVIDIA garak is the authoritative security source for publish decisions.
 
-Security is not optional. If garak is configured, it must produce a scored result. If it does not, publishing is blocked regardless of total score or label.
-
-| Garak status | Publisher action |
+| Garak result | Publisher effect |
 | --- | --- |
-| `scored` with no critical/high findings | Decision: `allow` |
-| `scored` with high findings | Decision: `review_required` |
-| `scored` with critical findings | Decision: `block` → gate fails → pipeline halts |
-| `not_configured` or `failed` | Decision: `block` → gate fails → pipeline halts |
-| `disabled` (`PUBLISHER_GARAK_ENABLED=false`) | Decision: `block` → gate fails → pipeline halts |
+| Scored, no high/critical findings | security decision `allow`; pipeline continues |
+| Scored, high findings | security decision `review_required`; pipeline continues |
+| Scored, critical findings | security decision `block`; security gate fails |
+| Not configured, disabled, failed, or unscored | security decision `block`; security gate fails |
 
-There is no local fallback security check that replaces garak for publish decisions. The publisher does contain heuristic prompt-injection checks (direct injection patterns, indirect injection patterns, sensitive exfiltration requests, policy bypass patterns, dangerous action requests, hidden/obfuscated instructions, role manipulation, promptmap-style attacks, and combined risk signal detection), but these are retained solely as implementation helpers and do not affect the security score or publish decision.
+`SecurityGate` blocks when:
 
-### Severity thresholds
+- the scan did not run,
+- no numeric score was produced,
+- the decision is invalid,
+- the decision is `block`.
 
-| Finding severity | Security gate effect |
-| --- | --- |
-| `critical` | `decision = block` — publish blocked unconditionally |
-| `high` | `decision = review_required` — publish blocked unless manually overridden |
-| `medium` | Contributes to score penalty (−0.15) but does not block |
-| `low` | Contributes to score penalty (−0.05) but does not block |
+`review_required` does not fail `SecurityGate`.
 
-### SecurityGate rules
+## Validation Policy
 
-The `SecurityGate` blocks the pipeline if any of the following are true:
+The validation stage checks the skill folder and `SKILL.md` contract. Errors
+block the validation gate; warnings are advisory and affect scoring only.
 
-1. `security.scanned` is `False` — garak did not run or did not produce output.
-2. `security.score` is `None` — garak ran but did not produce a numeric score.
-3. `security.decision` is `"block"` — critical findings or an unscored result.
+Blocking examples include:
 
-A `review_required` decision does **not** block the `SecurityGate`. The pipeline continues, but the `RankingStage` sets `publish_decision = "review_required"`, which the CLI prints and which prevents the upload step from proceeding (the CLI checks `publish_decision != "block"` before uploading, but `review_required` is treated the same as `block` at upload time).
+- missing skill root or `SKILL.md`,
+- invalid frontmatter/body shape,
+- missing or invalid `name`,
+- missing or invalid `description`,
+- `README.md` inside the skill folder,
+- reserved names,
+- invalid compatibility field,
+- empty body.
 
----
+## Metadata Gate
 
-## Anthropic Compliance Policy
+`MetadataGate` blocks when required metadata is missing:
 
-The `ValidationStage` enforces the Anthropic SKILL.md contract. All rules are applied to the skill folder and `SKILL.md`. Violations produce errors (blocking) or warnings (advisory).
+- `name`,
+- `description`,
+- `tags`,
+- `inputs_schema`,
+- `outputs_schema`.
 
-### Error rules (blocking)
+It also blocks invalid `maturity_score` or `security_score` values outside
+`0.0` to `1.0`.
 
-| Rule | Requirement |
-| --- | --- |
-| Skill root exists | Directory must exist |
-| Skill folder kebab-case | Folder name matches `[a-z0-9]+(-[a-z0-9]+)*` |
-| SKILL.md present | `SKILL.md` must exist in the skill root |
-| No README in skill folder | `README.md` must not appear inside the skill folder |
-| YAML frontmatter present | `SKILL.md` must start with `---` delimited YAML block |
-| `name` field present | Non-empty `name` in frontmatter |
-| `name` kebab-case | No spaces, capital letters, or special characters |
-| `name` matches folder | `frontmatter.name` must match the folder name |
-| `name` reserved words | `"claude"` and `"anthropic"` are banned |
-| `description` present | Non-empty `description` in frontmatter |
-| `description` length | Under 1024 characters |
-| `description` trigger guidance | Must contain action markers (e.g. "creates", "handles") and trigger markers (e.g. "use when", "when user") |
-| No XML angle brackets | `<` or `>` forbidden in any frontmatter string field |
-| `compatibility` length | 1–500 characters if the field is present |
-| Body present | SKILL.md must contain non-empty content after frontmatter |
+## Publish Decision
 
-### Warning rules (advisory)
+The ranking stage computes `publish_decision`:
 
-| Rule | Guidance |
-| --- | --- |
-| Instructions heading | Body should include a `# Instructions` heading |
-| Examples presence | Body should include at least one example |
-| Troubleshooting presence | Body should include a troubleshooting section |
-
-### ValidationGate rules
-
-The `ValidationGate` blocks if:
-
-1. No validation artifact was written.
-2. No checks were recorded as run.
-3. Any validation error is present (`validation.errors` is non-empty).
-
-Warnings in `validation.warnings` propagate to the ranking stage, where they reduce the `anthropic_compliance` score from `1.0` to `0.8`. They do not block the gate.
-
----
-
-## Ranking and the Publish Decision
-
-The ranking stage synthesizes the security and validation outcomes into a final `publish_decision`. The decision overrides the numeric score in determining whether an upload proceeds.
-
-| Condition | `publish_decision` |
+| Condition | Decision |
 | --- | --- |
 | `security.decision == "block"` | `block` |
-| `not validation.passed` | `review_required` |
+| validation did not pass | `review_required` |
 | `security.decision == "review_required"` | `review_required` |
-| All gates passed, no high/critical security | `allow` |
+| otherwise | `allow` |
 
-The `publish` CLI command uploads only when `publish_decision == "allow"`. Both `block` and `review_required` halt the upload.
+Current CLI behavior blocks upload only when `publish_decision == "block"`.
+`review_required` is visible in output but is not currently an upload stop in
+`publisher/app/cli.py`.
 
----
+## Environment Reference
 
-## Registry vs. Publisher Policy Boundary
-
-The publisher and the registry each enforce distinct policy domains. Neither delegates to the other.
-
-| Policy question | Enforced by |
+| Variable | Purpose |
 | --- | --- |
-| Is the skill content free of injection attacks? | Publisher (garak) |
-| Does SKILL.md follow Anthropic's structure rules? | Publisher (validation) |
-| Is the publisher's `trust_tier` allowed for this namespace? | Registry |
-| Does the registry caller have `publish` scope? | Registry |
-| Is the lifecycle state a valid transition? | Registry |
-| Is the bundle checksum correct? | Registry (on receive) |
-| Are governance policy pack rules satisfied? | Registry |
-
-The publisher cannot grant or override registry governance decisions. A skill that passes all publisher gates may still be rejected by the registry if the caller's token lacks `publish` scope, if the trust tier is not permitted for the target namespace, or if a policy pack rule blocks it.
-
----
-
-## Configuration Reference
-
-| Environment variable | Default | Description |
-| --- | --- | --- |
-| `APTITUDE_REGISTRY_URL` | `http://127.0.0.1:8000` | Registry base URL |
-| `APTITUDE_PUBLISH_TOKEN` | — | Registry publish token |
-| `PUBLISHER_GARAK_ENABLED` | `true` | Set `false` to skip garak (still blocks publish) |
-| `PUBLISHER_GARAK_COMMAND` | — | Full garak command template (`{skill_path}`, `{skill_file}`, `{artifact_dir}`) |
-| `GARAK_TARGET_TYPE` | — | Garak target type (e.g. `openai`) |
-| `GARAK_TARGET_NAME` | — | Garak target name (e.g. `gpt-4o-mini`) |
-| `GARAK_PROBES` | `promptinject` | Garak probe set |
-| `GARAK_DETECTORS` | — | Garak detector override |
-| `PUBLISHER_GARAK_TIMEOUT_SECONDS` | `180` | Garak subprocess timeout |
-| `PUBLISHER_UPSKILL_ENABLED` | `true` | Set `false` to skip Upskill |
-| `PUBLISHER_UPSKILL_COMMAND` | — | Full Upskill command template (`{skill_path}`, `{artifact_dir}`, `{runs_dir}`) |
-| `UPSKILL_MODELS` | — | Comma-separated model names for Upskill |
-| `UPSKILL_PROVIDER` | — | Upskill provider name |
-| `UPSKILL_BASE_URL` | — | OpenAI-compatible base URL for direct Upskill API mode |
-| `UPSKILL_API_KEY` | — | API key for direct Upskill API mode |
-| `UPSKILL_TESTS_PATH` | — | Path to JSON test cases for direct Upskill API mode |
-| `UPSKILL_NO_BASELINE` | `false` | Skip baseline measurement in Upskill |
-| `PUBLISHER_UPSKILL_TIMEOUT_SECONDS` | `600` | Upskill subprocess timeout |
+| `APTITUDE_REGISTRY_URL` | Registry base URL. |
+| `APTITUDE_SERVER_BASE_URL` | Alternate registry base URL. |
+| `APP_PORT` | Local registry port fallback. |
+| `APTITUDE_PUBLISH_TOKEN` | Registry publish token. |
+| `APTITUDE_INTEGRATION_PUBLISH_TOKEN` | Alternate publish token. |
+| `PUBLISH_TOKEN` | Alternate publish token. |
+| `PUBLISHER_GARAK_ENABLED` | Disabling garak still blocks publish. |
+| `PUBLISHER_GARAK_COMMAND` | garak command template. |
+| `GARAK_TARGET_TYPE`, `GARAK_TARGET_NAME` | garak target configuration. |
+| `GARAK_PROBES`, `GARAK_DETECTORS` | garak probe/detector configuration. |
+| `PUBLISHER_GARAK_TIMEOUT_SECONDS` | garak timeout. |
+| `PUBLISHER_UPSKILL_ENABLED` | Enable/disable optional Upskill evaluation. |
+| `PUBLISHER_UPSKILL_COMMAND` | Upskill command template. |
+| `UPSKILL_MODELS`, `UPSKILL_PROVIDER`, `UPSKILL_BASE_URL`, `UPSKILL_API_KEY`, `UPSKILL_TESTS_PATH`, `UPSKILL_NO_BASELINE` | Upskill configuration. |
+| `PUBLISHER_UPSKILL_TIMEOUT_SECONDS` | Upskill timeout. |
