@@ -325,6 +325,23 @@ The metadata JSON contains:
 Governance values come from CLI flags and git provenance. They are not inferred
 from the skill body.
 
+Relationships are not accepted from `SKILL.md`, CLI flags, or any current
+publisher parser path. The publisher currently sends the relationship block as
+empty generated defaults:
+
+```json
+{
+  "depends_on": [],
+  "extends": [],
+  "conflicts_with": [],
+  "overlaps_with": []
+}
+```
+
+Do not document dependencies or related skills in frontmatter expecting the
+publisher to publish them. Relationship extraction needs a dedicated publisher
+implementation before these values can come from skill author input.
+
 ## Common Failure Modes
 
 | Failure | Fix |
