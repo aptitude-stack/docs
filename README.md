@@ -39,6 +39,8 @@ The most important boundary is simple:
   ownership boundary.
 - [Architecture](https://github.com/aptitude-stack/docs/blob/main/publisher/architecture.md) - package map, pipeline, gates,
   artifacts, and registry transport.
+- [Skill Format](https://github.com/aptitude-stack/docs/blob/main/publisher/skill-format.md) - publish-ready skill folder and `SKILL.md`
+  expectations.
 - [Evaluation Pipeline](https://github.com/aptitude-stack/docs/blob/main/publisher/evaluation-pipeline.md) - stage-by-stage
   reference for inspection and publish runs.
 - [Audit Pipeline](https://github.com/aptitude-stack/docs/blob/main/publisher/audit-pipeline.md) - local `.publisher_artifacts`
