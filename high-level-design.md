@@ -13,7 +13,7 @@
   - **Governance and control** — no closed, policy-controlled publication model for enterprises, no lifecycle management, no enforcement layer between "available" and "allowed."
   - **Monolithic skills** — skills bloat into all-in-one prompts as logic accumulates, degrading performance; no dependency model to factor shared logic out, no lockfile to keep behavior consistent across environments.
 
-- **Proposed Solution:** Aptitude is a three-surface product — `aptitude-publisher` for authoring and CI release flows, `aptitude-registry-api` as the authoritative registry backend, and `aptitude-resolver` as the consumer-side discovery, solving, locking, and execution-planning client. Interaction surfaces are CLI + MCP for developers and agents, and a Next.js website (aptitude-registry.dev) for catalog browsing.
+- **Proposed Solution:** Aptitude is a three-surface product — `aptitude-publisher` for authoring and CI release flows, `aptitude-registry` as the authoritative registry backend, and `aptitude-resolver` as the consumer-side discovery, solving, locking, and execution-planning client. Interaction surfaces are CLI + MCP for developers and agents, and a Next.js website (aptitude-registry.dev) for catalog browsing.
 
 - **Success Criteria:**
   - Discovery returns accurate, relevant candidates with low latency.
