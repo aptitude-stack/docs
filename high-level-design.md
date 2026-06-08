@@ -215,17 +215,6 @@ Skills are organized into namespaces (e.g. `public`, `internal`, `org/team`). Na
 - Namespace assignment is set at publish time via CLI flag and cannot be changed after publication without an `admin` token.
 - Enterprises can isolate their skill catalog entirely within a private namespace while still consuming public skills.
 
-### Configurable Policies
-
-Policy packs are named, versioned rule sets attached to a namespace or an individual skill. They are evaluated at both publish and resolve time:
-
-- **At publish:** the publisher attaches a `policy_pack_slug` to the registry payload. The registry validates the skill against the named pack's rules before accepting the version.
-- **At resolve:** the resolver loads the effective policy from its local config and filters and re-ranks candidates accordingly. Skills that violate policy are excluded before the lockfile is generated.
-
-Configurable policy dimensions include trust tier requirements (`untrusted` / `internal` / `verified`), lifecycle state allowlists (e.g. block `deprecated` skills), artifact origin restrictions, and maximum dependency depth.
-
-See [registry/policies.md](registry/policies.md) · [publisher/policies.md](publisher/policies.md)
-
 ---
 
 ## Security Measures
