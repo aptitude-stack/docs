@@ -164,11 +164,14 @@ An agent or developer calls `aptitude install "find a skill for FastAPI code rev
 
 ```mermaid
 flowchart LR
-    Q["User query"] --> RES["Resolver\nintent → select → solve → govern"]
-    RES -->|"POST /discovery\nGET /resolution"| REG["Registry"]
+    Q["User query"] --> RES["Resolver: intent, select, solve, govern"]
+    RES --> DISC["POST /discovery"]
+    RES --> RESOLVE["GET /resolution"]
+    DISC --> REG["Registry"]
+    RESOLVE --> REG
     REG --> RES
     RES --> LF["aptitude.lock.json"]
-    LF --> MAT["Materialized\nskill files"]
+    LF --> MAT["Materialized skill files"]
 ```
 
 ### Lock Replay
@@ -184,15 +187,13 @@ flowchart LR
 
 ## Interfaces
 
-| Interface                              | Used by               | Description                                      |
-| -------------------------------------- | --------------------- | ------------------------------------------------ |
-| `aptitude-publisher inspect`           | Skill authors         | Run evaluation pipeline, print report, no upload |
-| `aptitude-publisher publish`           | Skill authors, CI     | Full evaluation + registry upload                |
-| `aptitude install`                     | Developers, CI        | Fresh planning and materialization from a query  |
-| `aptitude sync --lock`                 | Developers, CI        | Replay an existing lockfile                      |
-| `aptitude policy show`                 | Developers, operators | Inspect effective policy and config layers       |
-| `aptitude mcp`                         | Agent hosts           | Start the local stdio MCP server                 |
-| `POST /discovery`                      | Resolver, Web         | Search for candidate skill slugs                 |
-| `GET /skills/{slug}/{version}`         | Resolver, Web         | Exact immutable metadata                         |
-| `GET /skills/{slug}/{version}/content` | Resolver              | Immutable `.tar.zst` artifact bytes              |
-
+| Interface                                      | Used by                | Description                                                                 |
+| ---------------------------------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `uvx aptitude-publisher`                       | Skill authors, CI      | Publish client for inspecting, validating, packaging, and publishing skills |
+| `uvx aptitude-resolver`                        | Developers, CI, agents | Resolver client for discovering, locking, syncing, and materializing skills |
+| `POST /skills/{slug}`                          | Publisher              | Publish a validated skill version                                           |
+| `POST /discovery`                              | Resolver, Website      | Search for candidate skill slugs                                            |
+| `GET /skills/{slug}`                           | Resolver, Website      | List visible versions for a skill                                           |
+| `GET /skills/{slug}/{version}`                 | Resolver, Website      | Fetch exact immutable version metadata                                      |
+| `GET /resolution/{slug}/{version}`             | Resolver               | Fetch authored dependency selectors for graph resolution                    |
+| `GET /skills/{slug}/{version}/content`         | Resolver               | Download the immutable `.tar.zst` artifact                                  |
