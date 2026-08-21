@@ -10,7 +10,7 @@ catalog metadata for the website.
 
 ```mermaid
 flowchart TD
-    Req["Request\nname, description, tags, context_skills"]
+    Req["Request\nquery (required), explicit tags?, context_skills?"]
     Norm["Normalize\nquery text, tags, semantic text"]
     Lex["Lexical search\nskill_search_documents"]
     Sem["Semantic search\nskill_search_embeddings"]
@@ -51,12 +51,30 @@ only apply when the request includes `context_skills`.
 
 ## Request Normalization
 
+The discovery request body contains required `query`, optional explicit `tags`,
+and optional `context_skills` coordinate objects:
+
+```json
+{
+  "query": "Python linting",
+  "tags": ["python", "lint"],
+  "context_skills": [{"slug": "python-format", "version": "1.0.0"}]
+}
+```
+
+`query` supplies the request text for both lexical and semantic search. The
+request's `tags` are only explicit tag filters, while each `context_skills`
+entry is a `{slug, version}` coordinate used for optional co-usage lookup.
+
+Stored skill `name`, `description`, and `tags` remain indexed metadata; they
+are not request fields. Lexical matching uses those indexed fields, while
+exact `slug` and normalized `name` matches remain ranking signals.
+
 The registry normalizes:
 
-- free text from `name` and `description`,
-- tags and structured filters,
-- semantic text from description/tags-oriented content,
-- context skill slugs for optional co-usage lookup.
+- the `query` text for lexical and semantic search,
+- explicitly supplied tags as structured filters,
+- context skill coordinates for optional co-usage lookup.
 
 Normalization also creates deterministic explanation fields used by catalog
 search cards.
@@ -117,7 +135,7 @@ Discovery response:
 
 ```json
 {
-  "candidates": ["python.ruff", "python.pytest"]
+  "candidates": ["python-ruff", "python-pytest"]
 }
 ```
 

@@ -70,7 +70,7 @@ good: python-review
 good: postman-primary-1774130709214
 bad: Python Review
 bad: python_review
-bad: python.review
+bad: python-review
 ```
 
 The frontmatter `name` must exactly match the folder name.

@@ -33,7 +33,7 @@ One row per skill slug. Mutable aggregate counters live here; content and versio
 | Column | Type | Nullable | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `id` | `bigint` | not null | autoincrement PK | Internal surrogate key |
-| `slug` | `text` | not null | — | Globally unique skill identifier, e.g. `python.lint` |
+| `slug` | `text` | not null | — | Globally unique skill identifier, e.g. `python-lint` |
 | `namespace_fk` | `bigint` | not null | — | FK → `namespaces.id` (RESTRICT on delete) |
 | `install_count` | `bigint` | not null | `0` | Mutable aggregate; incremented by install telemetry |
 | `star_count` | `bigint` | not null | `0` | Mutable aggregate; updated by `POST /catalog/star-events` |
