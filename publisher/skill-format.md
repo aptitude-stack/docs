@@ -14,17 +14,20 @@ A publish-ready skill should satisfy all of these conditions:
 
 - The skill lives in one folder whose name is kebab-case.
 - The folder contains a primary `SKILL.md` file.
+- The folder contains a required `aptitude.yaml` sidecar.
 - The folder does not contain `README.md`.
 - `SKILL.md` starts with YAML frontmatter delimited by `---`.
-- Frontmatter includes `name`, `description`, and a `metadata` block.
+- Frontmatter contains the standard skill fields `name` and `description`; optional `license` and `compatibility` remain there too.
 - `name` matches the folder name and is kebab-case.
 - `description` explains what the skill does and when to use it.
-- `metadata.tags`, `metadata.inputs_schema`, and `metadata.outputs_schema` are
-  present.
+- `aptitude.yaml` contains `version`, `intent`, `tags`, `inputs_schema`, and
+  `outputs_schema`.
 - The body after frontmatter contains actual instructions.
 - Optional files live under `scripts/`, `references/`, or `assets/`.
-- Generated `.publisher_artifacts/` output is not treated as skill content and
-  is excluded from the uploaded bundle.
+- `agents/openai.yaml`, when present, remains an independent OpenAI configuration
+  file.
+- The legacy `.publisher_artifacts/` directory is preserved, ignored, and
+  excluded from the uploaded bundle; the publisher does not read or write it.
 
 ## Folder Layout
 
@@ -33,6 +36,9 @@ Recommended layout:
 ```text
 my-skill/
   SKILL.md
+  aptitude.yaml
+  agents/
+    openai.yaml
   scripts/
     helper.py
   references/
@@ -46,11 +52,15 @@ The publisher inventories the full folder:
 | Path | Meaning |
 | --- | --- |
 | `SKILL.md` | Primary skill definition. Required. |
+| `aptitude.yaml` | Aptitude publishing metadata. Required. |
+| `agents/openai.yaml` | Independent OpenAI skill configuration, when present. |
 | `scripts/` | Optional executable or helper scripts. |
 | `references/` | Optional markdown or source material the skill can reference. |
 | `assets/` | Optional binary or visual assets. |
 | Other `.md` files | Companion markdown included in word/token metrics. |
-| Other files | Included in inventory and uploaded bundle unless under `.publisher_artifacts/`. |
+| Other files | Included in inventory and uploaded bundle unless under the preserved `.publisher_artifacts/` directory. |
+
+Evaluator inputs materialize file symlinks as independent copies. Directory symlinks are rejected with a diagnostic; use ordinary directories for evaluator input.
 
 `README.md` is not allowed inside the skill folder. Put human-facing background
 inside `SKILL.md` or `references/`.
@@ -77,19 +87,14 @@ The frontmatter `name` must exactly match the folder name.
 
 ## SKILL.md Structure
 
-`SKILL.md` must start with frontmatter and then contain markdown instructions:
+`SKILL.md` must start with standard frontmatter and then contain markdown
+instructions. Aptitude publishing metadata belongs in the adjacent
+`aptitude.yaml`, not in this frontmatter:
 
 ```markdown
 ---
 name: python-review
 description: Helps review Python services when users ask for code quality, test, or architecture feedback.
-metadata:
-  tags: [python, review, testing]
-  inputs_schema: {"type": "object", "properties": {"request": {"type": "string"}}}
-  outputs_schema: {"type": "object", "properties": {"findings": {"type": "array"}}}
-  maturity_score: 0.8
-  security_score: 0.9
-  token_estimate: 1200
 compatibility: Works with Python repositories.
 license: MIT
 ---
@@ -118,7 +123,28 @@ If no relevant files are available, ask for the target path before producing a
 review.
 ```
 
-## Frontmatter Fields
+The corresponding `aptitude.yaml` is:
+
+```yaml
+version: "0.1.0"
+intent: create_skill
+tags: [python, review, testing]
+inputs_schema:
+  type: object
+  properties:
+    request:
+      type: string
+outputs_schema:
+  type: object
+  properties:
+    findings:
+      type: array
+token_estimate: 1200
+maturity_score: 0.8
+security_score: 0.9
+```
+
+## `SKILL.md` Frontmatter Fields
 
 ### Required Top-Level Fields
 
@@ -126,25 +152,39 @@ review.
 | --- | --- | --- |
 | `name` | Yes | Non-empty kebab-case string matching the folder name. |
 | `description` | Yes | Non-empty string under 1024 characters. |
-| `metadata` | Yes | Mapping containing publish metadata. |
+| `metadata` | No | Other standard metadata entries remain independent of Aptitude publishing metadata. |
 
-### Required Metadata Fields
+`name` and `description` are required. `license` and `compatibility` are
+optional standard skill fields and stay in `SKILL.md`.
 
-| Field | Required | Rule |
-| --- | --- | --- |
-| `metadata.tags` | Yes | Non-empty list of strings. |
-| `metadata.inputs_schema` | Yes | JSON-object-compatible mapping. |
-| `metadata.outputs_schema` | Yes | JSON-object-compatible mapping. |
+## `aptitude.yaml` Fields
 
-### Optional Metadata Fields
+`aptitude.yaml` is a flat YAML mapping beside `SKILL.md`. It is required even
+when CLI or MCP values override some fields.
 
 | Field | Required | Rule |
 | --- | --- | --- |
-| `metadata.token_estimate` | No | Integer. Recorded as declared token estimate; publisher still computes its own estimate. |
-| `metadata.maturity_score` | No | Number from `0.0` to `1.0`. |
-| `metadata.security_score` | No | Number from `0.0` to `1.0`. |
-| `compatibility` | No | String from 1 to 500 characters if present. |
-| `license` | No | String; copied into publisher metadata extras. |
+| `version` | Yes unless supplied by `--version` | Non-empty string. |
+| `intent` | Yes unless supplied by `--intent` | Non-empty string: `create_skill` or `publish_version`. |
+| `tags` | Yes | Non-empty list of strings. |
+| `inputs_schema` | Yes | JSON-object-compatible mapping. |
+| `outputs_schema` | Yes | JSON-object-compatible mapping. |
+| `relationships` | No | Mapping of relationship families; omitted families default to empty lists. |
+
+Optional numeric hints are also accepted in the sidecar:
+
+| Field | Required | Rule |
+| --- | --- | --- |
+| `token_estimate` | No | Integer authored hint; the publisher's computed or measured estimate takes precedence when available. |
+| `maturity_score` | No | Number from `0.0` to `1.0`; computed scores take precedence when available. |
+| `security_score` | No | Number from `0.0` to `1.0`; the authoritative security result takes precedence. |
+
+The publisher rejects duplicate YAML keys, unknown sidecar fields, invalid
+types, and malformed relationship selectors with file-specific errors. CLI and
+MCP identity values override the sidecar; otherwise `version` and `intent` come
+from `aptitude.yaml` and `slug` comes from the `SKILL.md` `name`.
+
+`agents/openai.yaml` is independent and is not a source for Aptitude metadata.
 
 ## Description Requirements
 
@@ -197,20 +237,86 @@ used by the ranking stage. A publish-ready skill should include all three.
 
 ## Schema Fields
 
-`inputs_schema` and `outputs_schema` should be JSON-schema-like objects. The
-current publisher only requires that they parse as mappings, but authors should
-make them useful enough for reviewers, registry users, and downstream tools.
+`inputs_schema` and `outputs_schema` in `aptitude.yaml` should be JSON-schema-like
+objects. The current publisher only requires that they parse as mappings, but
+authors should make them useful enough for reviewers, registry users, and
+downstream tools.
 
 Minimal example:
 
 ```yaml
-metadata:
-  inputs_schema: {"type": "object", "properties": {"request": {"type": "string"}}}
-  outputs_schema: {"type": "object", "properties": {"result": {"type": "string"}}}
+inputs_schema:
+  type: object
+  properties:
+    request:
+      type: string
+outputs_schema:
+  type: object
+  properties:
+    result:
+      type: string
 ```
 
 Prefer explicit properties over empty objects when the skill expects a concrete
 workflow.
+
+## Relationship Fields
+
+Relationships are optional in `aptitude.yaml`. Each family contains selectors
+with a `slug` and optional `version` or `version_constraint`:
+
+```yaml
+relationships:
+  depends_on:
+    - slug: python-testing
+      version: "0.1.2"
+  extends: []
+  conflicts_with: []
+  overlaps_with: []
+```
+
+The publisher normalizes omitted families to empty lists and rejects malformed
+selectors before external evaluation.
+
+## Legacy Frontmatter Migration
+
+The publisher does not fall back to Aptitude fields in `SKILL.md` frontmatter.
+It rejects known legacy fields such as `version`, `intent`, `tags`, schemas,
+relationships, and numeric hints, whether they appear at the top level or under
+`metadata`. Unrelated standard `metadata` entries remain valid.
+
+Move those fields manually to `aptitude.yaml`, leaving standard skill fields in
+`SKILL.md`:
+
+```diff
+ ---
+ name: python-review
+ description: Helps review Python services when users ask for code quality, tests, or architecture feedback.
+-metadata:
+-  version: "0.1.0"
+-  intent: create_skill
+-  tags: [python, review]
+-  inputs_schema: {}
+-  outputs_schema: {}
+-  maturity_score: 0.8
+ compatibility: Works with Python repositories.
+ license: MIT
+ ---
+```
+
+Create `aptitude.yaml` beside it:
+
+```yaml
+version: "0.1.0"
+intent: create_skill
+tags: [python, review]
+inputs_schema: {}
+outputs_schema: {}
+maturity_score: 0.8
+```
+
+The sidecar is included in the skill bundle and its checksum, so changing it
+invalidates inspection reuse.
 
 ## Files Included In The Bundle
 
@@ -219,36 +325,40 @@ The uploaded bundle is built from the skill folder as deterministic
 
 The archive:
 
-- includes files from the skill folder,
-- excludes `.publisher_artifacts/`,
+- includes `SKILL.md`, `aptitude.yaml`, `agents/openai.yaml` when present, and
+  other files from the skill folder,
+- excludes the preserved `.publisher_artifacts/` directory,
 - stores files under the archive root `skill-bundle/`,
 - normalizes file metadata for deterministic output.
 
-Generated publisher artifacts are local audit records only. They are not part
-of the uploaded skill.
+The cache report and temporary evaluator workspaces are outside the skill
+folder and are never part of the uploaded skill.
 
-## Publisher Artifacts
+## Evaluation Report
 
-During `inspect` or `publish`, the publisher writes `.publisher_artifacts/`
-inside the skill folder.
+Each canonical skill directory has one latest JSON report outside the source
+tree. The cache root is the absolute `XDG_CACHE_HOME` when configured, or
+`~/.cache` otherwise:
 
-Common artifacts:
+```text
+<cache-root>/aptitude/publisher/<sha256(canonical-absolute-skill-directory)>.json
+```
 
-| Artifact | Purpose |
-| --- | --- |
-| `00_inventory.json` | File inventory, git provenance, and parsed package context. |
-| `01_identity.json` | Slug, version, and publish intent. |
-| `02_metadata.json` | Extracted metadata and publisher-computed token/word metrics. |
-| `04_security.json` | garak security result. |
-| `05_validation.json` | Validation errors, warnings, checks, and notes. |
-| `05_performance_exam.json` | Optional Upskill metrics. |
-| `03_ranking.json` | Weighted quality score and publish decision. |
-| `07_compression.json` | Local delivery-package compression stats. |
-| `07_delivery_package.zst` | Compressed delivery payload JSON for local traceability. |
+The report is atomically replaced and uses owner-only permissions. Its envelope
+has `schema_version`, `skill_root`, `updated_at`, `status`, `stages`, `gates`,
+`evidence`, `warnings`, `error`, and `inspection_receipt`. Status is one of
+`running`, `ready`, `blocked`, or `failed`; exact evaluation decisions remain
+inside the normalized evidence. When available, the signed inspection receipt
+is nested under `inspection_receipt` and retains its MAC, expiry, configuration
+fingerprint, identity, governance, and source-digest checks.
 
-These files are useful for review and debugging. They should not be committed
-as part of the skill content unless a separate review workflow explicitly asks
-for them.
+Raw evaluator transcripts, credentials, environment dumps, and temporary paths
+are not retained. Evaluators run against temporary copies and working
+directories outside the source tree; those files are cleaned after success,
+failure, or timeout. Existing `.publisher_artifacts/` directories are preserved
+for historical content, excluded from inventory and bundles, and never read or
+written by the current publisher. There is no automatic migration or report
+history.
 
 ## Validation Gates
 
@@ -325,9 +435,9 @@ The metadata JSON contains:
 Governance values come from CLI flags and git provenance. They are not inferred
 from the skill body.
 
-Relationships are not accepted from `SKILL.md`, CLI flags, or any current
-publisher parser path. The publisher currently sends the relationship block as
-empty generated defaults:
+Relationships from `aptitude.yaml` are normalized into the registry payload.
+When `relationships` is omitted, the publisher sends empty defaults for each
+supported family:
 
 ```json
 {
@@ -338,9 +448,8 @@ empty generated defaults:
 }
 ```
 
-Do not document dependencies or related skills in frontmatter expecting the
-publisher to publish them. Relationship extraction needs a dedicated publisher
-implementation before these values can come from skill author input.
+Do not put Aptitude relationships in `SKILL.md` frontmatter. Legacy Aptitude
+fields there are rejected and must be moved manually as shown above.
 
 ## Common Failure Modes
 
@@ -348,8 +457,11 @@ implementation before these values can come from skill author input.
 | --- | --- |
 | `SKILL.md must start with YAML frontmatter` | Put a `---` block at the top of `SKILL.md`. |
 | `Frontmatter name should match the skill folder name` | Rename the folder or update `name`. |
-| `Metadata is missing inputs_schema` | Add `metadata.inputs_schema`. |
-| `Metadata is missing outputs_schema` | Add `metadata.outputs_schema`. |
+| `aptitude.yaml` is missing | Create the required sidecar beside `SKILL.md`. |
+| `aptitude.yaml` is invalid | Use a flat mapping with the required fields and no unknown or duplicate keys. |
+| `Metadata is missing inputs_schema` | Add `inputs_schema` to `aptitude.yaml`. |
+| `Metadata is missing outputs_schema` | Add `outputs_schema` to `aptitude.yaml`. |
+| `Legacy Aptitude field ... must be moved ...` | Move version, intent, tags, schemas, relationships, or numeric hints from frontmatter to `aptitude.yaml`. |
 | `description must explain what the skill does and when to use it` | Add action and trigger language to `description`. |
 | `README.md must not appear inside the skill folder` | Move docs into `SKILL.md` or `references/`. |
 | garak did not produce a score | Configure garak target settings before publishing. |

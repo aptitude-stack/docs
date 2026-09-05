@@ -9,7 +9,7 @@ governance data it passes to the registry.
 | --- | --- |
 | Does the skill folder pass local discovery, identity, metadata, security, and validation gates? | Publisher |
 | Does garak produce an acceptable security result? | Publisher |
-| Does `SKILL.md` satisfy publisher validation rules? | Publisher |
+| Do `SKILL.md` and `aptitude.yaml` satisfy publisher validation rules? | Publisher |
 | Is this caller allowed to publish to a namespace/trust tier? | Registry |
 | Is the service token valid and scoped for publish? | Registry |
 | Is lifecycle/review/promotion state valid? | Registry |
@@ -58,15 +58,18 @@ NVIDIA garak is the authoritative security source for publish decisions.
 
 ## Validation Policy
 
-The validation stage checks the skill folder and `SKILL.md` contract. Errors
-block the validation gate; warnings are advisory and affect scoring only.
+The validation stage checks the skill folder, `SKILL.md` contract, and required
+`aptitude.yaml` sidecar. Errors block the validation gate; warnings are
+advisory and affect scoring only.
 
 Blocking examples include:
 
 - missing skill root or `SKILL.md`,
+- missing or invalid `aptitude.yaml`,
 - invalid frontmatter/body shape,
 - missing or invalid `name`,
 - missing or invalid `description`,
+- known Aptitude fields left in legacy `SKILL.md` frontmatter,
 - `README.md` inside the skill folder,
 - reserved names,
 - invalid compatibility field,
@@ -82,8 +85,64 @@ Blocking examples include:
 - `inputs_schema`,
 - `outputs_schema`.
 
+`name` and `description` come from `SKILL.md`; `tags`, `inputs_schema`, and
+`outputs_schema` come from `aptitude.yaml`. The sidecar also carries
+`version`, `intent`, and optional `relationships`.
+
 It also blocks invalid `maturity_score` or `security_score` values outside
 `0.0` to `1.0`.
+
+## Source Metadata Policy
+
+`aptitude.yaml` is a flat YAML mapping beside `SKILL.md` with these required
+fields:
+
+```yaml
+version: "0.1.0"
+intent: create_skill
+tags: [python]
+inputs_schema: {}
+outputs_schema: {}
+relationships:
+  depends_on:
+    - slug: python-testing
+      version: "0.1.2"
+```
+
+`relationships` is optional; omitted relationship families default to empty
+lists. Optional numeric hints are `token_estimate`, `maturity_score`, and
+`security_score`. Computed evaluation values supersede authored hints when
+available. CLI and MCP values override sidecar identity values, while the
+`SKILL.md` `name` supplies the slug by default.
+
+The publisher rejects duplicate keys, unknown sidecar fields, invalid types,
+and malformed relationship selectors. It rejects known Aptitude fields in
+legacy frontmatter rather than falling back to them. Move those fields manually
+to `aptitude.yaml`; keep `name`, `description`, `license`, and `compatibility` in
+`SKILL.md`. `agents/openai.yaml` remains independent and unchanged.
+
+## Evaluation Report Policy
+
+The publisher keeps one latest JSON report for each canonical skill directory.
+The cache root is the absolute `XDG_CACHE_HOME` when configured, or `~/.cache`
+otherwise:
+
+```text
+<cache-root>/aptitude/publisher/<sha256(canonical-absolute-skill-directory)>.json
+```
+
+The report is atomically replaced with owner-only permissions. It contains
+`schema_version`, `skill_root`, `updated_at`, `status`, `stages`, `gates`,
+`evidence`, `warnings`, `error`, and a nested signed `inspection_receipt` when
+available. Status values are `running`, `ready`, `blocked`, and `failed`.
+Normalized stage, gate, security, performance, and decision evidence is kept;
+credentials, raw evaluator transcripts, environment dumps, and temporary paths
+are not retained. Evaluator copies and working directories live outside the
+source tree and are cleaned after success, failure, or timeout.
+
+Existing `.publisher_artifacts/` directories are preserved historical content,
+excluded from inventory and bundles, and not read or written. The MCP response
+field is `report_path`; `artifacts_dir` is obsolete.
 
 ## Publish Decision
 

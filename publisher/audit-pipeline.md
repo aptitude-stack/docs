@@ -6,7 +6,9 @@
 
 The publisher does not have a separate audit service. Instead, every stage and every gate writes structured records directly into the shared `PublishContext` as it runs. At the end of a pipeline run, `PublishContext` carries a complete, ordered trace of every decision made — which stages completed, which gates passed or failed, and why.
 
-This trace is available to the CLI (which renders a human-readable report), to the registry upload call (which can reference `security_score` and other fields in the registry payload), and to post-run inspection of the `.publisher_artifacts/` directory.
+This trace is available to the CLI (which renders a human-readable report), to
+the registry upload call (which can reference `security_score` and other fields
+in the registry payload), and to post-run inspection of one JSON cache report.
 
 ---
 
@@ -41,26 +43,41 @@ Appended to `context.gate_history` by every gate after it runs.
 
 ---
 
-## Per-Stage Artifacts
+## Evaluation Report
 
-Each stage writes a numbered JSON artifact to `.publisher_artifacts/` inside the skill folder. These files persist after the pipeline exits and can be inspected offline.
+The publisher retains one latest JSON report per canonical skill directory. The
+cache root is the absolute `XDG_CACHE_HOME` when configured, or `~/.cache`
+otherwise. The report path is:
 
-| Artifact | Stage | Key fields |
-| --- | --- | --- |
-| `00_inventory.json` | Discovery | `skill_root`, `skill_markdown_path`, `script_files`, `reference_files`, `repo_url`, `commit_sha`, `notes` |
-| `01_identity.json` | Identity | `slug`, `version`, `intent`, `parsed_keys`, `notes` |
-| `02_metadata.json` | Metadata | `name`, `description`, `tags`, `token_estimate`, `word_count`, `repo_url`, `repo_signals`, `notes` |
-| `03_ranking.json` | Ranking | `total_score`, `criteria_scores`, `weights`, `label`, `publish_decision`, `explanation` |
-| `04_security.json` | Security | `scan_targets`, `checks_run`, `score`, `severity_counts`, `decision`, `findings`, `garak` (raw garak meta), `notes` |
-| `05_validation.json` | Validation | `passed`, `skill_root`, `skill_file`, `checks_run`, `frontmatter_keys`, `errors`, `warnings`, `notes` |
-| `05_performance_exam.json` | Performance exam | `score`, `passed`, `test_case_count`, `models_tested`, `baseline_success_rate`, `skilled_success_rate`, `skill_lift`, `token_delta`, `efficiency_label`, `upskill` (raw result meta), `notes` |
-| `07_compression.json` | Compression | `algorithm`, `available`, `compressed_artifact_path`, `uncompressed_size`, `compressed_size`, `compression_ratio`, `notes` |
-| `07_delivery_package.zst` | Compression | Compressed delivery payload bytes |
+```text
+<cache-root>/aptitude/publisher/<sha256(canonical-absolute-skill-directory)>.json
+```
 
-External evaluator artifacts are nested under:
+The report is atomically replaced with owner-only permissions. Its envelope is:
 
-- `garak/stdout.txt`, `garak/stderr.txt`, `garak/*.json` — raw garak output.
-- `upskill/stdout.txt`, `upskill/stderr.txt`, `upskill/runs/` — raw Upskill output.
+| Field | Contents |
+| --- | --- |
+| `schema_version` | Report schema version, currently `1`. |
+| `skill_root` | Canonical absolute skill directory. |
+| `updated_at` | UTC report update time. |
+| `status` | `running`, `ready`, `blocked`, or `failed`. |
+| `stages` | Ordered stage snapshots. |
+| `gates` | Gate decisions, blocking issues, warnings, and data. |
+| `evidence` | Normalized inventory, identity, metadata, security, validation, performance, and ranking evidence. |
+| `warnings` | Aggregated non-blocking warnings. |
+| `error` | Normalized terminal error, when a run fails. |
+| `inspection_receipt` | Nested signed receipt when inspection creates one; otherwise `null`. |
+
+The report keeps exact evaluation decisions inside `evidence`, including the
+security decision and `publish_decision`. Receipt validation continues to cover
+the receipt schema, MAC, expiry, configuration fingerprint, identity,
+governance, and source digest.
+
+Evaluator output is normalized before persistence. Credentials, environment
+dumps, raw garak or Upskill transcripts, and temporary file paths are not
+retained. Evaluators run against temporary copies and working directories
+outside the source tree; those files are cleaned after success, failure, or
+timeout.
 
 ---
 
@@ -79,6 +96,7 @@ intent          create_skill
 trust tier      untrusted
 namespace       public
 artifact origin internal
+report path      ~/.cache/aptitude/publisher/<sha256>.json
 
 ------------------------------------------------------------------------
 Evaluation Summary
@@ -108,7 +126,6 @@ validation_gate    passed
 performance_exam   completed
 ranking            completed
 delivery           completed
-compression        completed
 ```
 
 If security findings exist, each finding is printed with severity, check name, field, and evidence. If validation errors exist, they are listed in a separate section.
@@ -120,26 +137,29 @@ If security findings exist, each finding is printed with severity, check name, f
 The registry does not receive the full publisher trace. It receives only what is embedded in the registry payload via the delivery stage:
 
 - `metadata.security_score` — the garak score (`SecurityInfo.score`), not the finding list.
-- `metadata.maturity_score` — from frontmatter, if provided by the author.
+- `metadata.maturity_score` — from `aptitude.yaml`, if provided by the author.
 - `governance.*` — trust tier, namespace, artifact origin, policy pack slug, and git provenance.
 
 The finding detail, validation errors, Upskill metrics, ranking breakdown, stage history, and gate history all remain local. The registry performs its own independent governance evaluation after receiving the payload; the publisher's ranking score does not influence registry admission.
 
 ---
 
-## Auditing a Past Run
+## Auditing the Latest Run
 
-All artifacts remain in `.publisher_artifacts/` until the next `inspect` or `publish` run overwrites them (the directory is not cleared between runs — each stage simply overwrites its numbered artifact file).
-
-To review a past evaluation:
+Read the one report for the canonical skill directory:
 
 ```bash
-cat /path/to/my-skill/.publisher_artifacts/03_ranking.json
-cat /path/to/my-skill/.publisher_artifacts/04_security.json
-cat /path/to/my-skill/.publisher_artifacts/05_validation.json
+cat ~/.cache/aptitude/publisher/<sha256(canonical-absolute-skill-directory)>.json
 ```
 
-The `explanation` field in `03_ranking.json` contains one sentence per criterion describing how each score was derived and what its final weighted contribution was.
+Use `${XDG_CACHE_HOME}/aptitude/publisher/` instead when `XDG_CACHE_HOME` is
+configured as an absolute path. The report's `stages`, `gates`, and `evidence`
+sections contain the normalized trace and decisions. A new evaluation replaces
+the previous report; there is no report history.
+
+Existing `.publisher_artifacts/` directories are preserved historical content.
+They remain excluded from inventory and bundles, and the current publisher
+does not read or write them.
 
 ---
 
@@ -153,3 +173,5 @@ Both garak and Upskill can be disabled without uninstalling them:
 | `PUBLISHER_UPSKILL_ENABLED` | `true` | Set to `false` to skip Upskill. Performance score becomes `0.0`. |
 
 Setting `PUBLISHER_GARAK_ENABLED=false` is equivalent to garak being unconfigured: the security stage records a `block` decision and the security gate halts the pipeline. There is no way to bypass the security gate.
+
+A cache location that resolves inside the skill directory is rejected before writing; configure `XDG_CACHE_HOME` outside the source tree.
